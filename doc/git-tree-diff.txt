@@ -1,0 +1,66 @@
+*git-tree-diff.txt*  Browse a git diff as a file tree with side-by-side diffs
+
+Author:  Falko Strenzke
+License: same as the repository (see LICENSE)
+
+==============================================================================
+CONTENTS                                                *git-tree-diff-contents*
+
+    1. Introduction ................. |git-tree-diff-introduction|
+    2. Command ...................... |git-tree-diff-command|
+    3. Tree window .................. |git-tree-diff-tree|
+    4. Configuration ................ |git-tree-diff-configuration|
+
+==============================================================================
+1. INTRODUCTION                                     *git-tree-diff-introduction*
+
+git-tree-diff shows the result of a 'git diff' as a browsable, foldable file
+tree.  Selecting a file in the tree opens the two compared versions of that
+file in two equally sized windows in Vim's usual |diff-mode|.
+
+==============================================================================
+2. COMMAND                                               *git-tree-diff-command*
+
+                                                                *:FGitTreeDiff*
+:FGitTreeDiff [args]
+    Open a new tab page with the diff tree.  All [args] are handed through
+    to the underlying 'git diff' invocation, so anything 'git diff' accepts
+    works here as well.  Examples: >
+
+        :FGitTreeDiff                    " working tree vs. index
+        :FGitTreeDiff --cached           " index vs. HEAD
+        :FGitTreeDiff HEAD~3             " working tree vs. HEAD~3
+        :FGitTreeDiff main..feature      " two revisions
+        :FGitTreeDiff main...feature     " merge base of main vs. feature
+        :FGitTreeDiff HEAD -- src/       " limit to a path
+<
+    The tab contains three windows: the file tree on the far left (showing
+    only files with a non-empty diff) and two equally sized diff windows on
+    the right with the two compared versions of the selected file.
+
+    Versions taken from a git revision or the index are shown in read-only
+    scratch buffers named gtd://{rev}/{path}.  When one side is the working
+    tree, the actual file is edited, so changes can be made and saved.
+
+==============================================================================
+3. TREE WINDOW                                              *git-tree-diff-tree*
+
+The first two lines show the repository name and the compared revisions.
+Directories end with a "/" and can be folded with the usual |fold-commands|.
+
+Mappings in the tree window:
+
+    <CR>            On a file: show its diff in the right-hand windows.
+                    On a directory: toggle its fold.
+    o               Same as <CR>.
+    <2-LeftMouse>   Same as <CR>.
+    q               Close the tab page.
+
+==============================================================================
+4. CONFIGURATION                                   *git-tree-diff-configuration*
+
+                                                        *g:git_tree_diff_width*
+g:git_tree_diff_width
+    Width of the tree window in columns.  Default: 34
+
+ vim:tw=78:ts=8:ft=help:norl:
