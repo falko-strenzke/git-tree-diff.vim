@@ -188,7 +188,7 @@ endfunction
 
 function! s:SetupTreeBuffer(files) abort
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
-  setlocal nonumber norelativenumber nowrap nolist
+  setlocal nonumber norelativenumber nowrap nolist nospell
   setlocal winfixwidth cursorline signcolumn=no
   setlocal shiftwidth=2 foldlevel=99
   setlocal foldmethod=expr foldexpr=git_tree_diff#foldexpr(v:lnum)
