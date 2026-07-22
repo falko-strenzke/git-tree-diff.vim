@@ -119,17 +119,34 @@ function! git_tree_diff#run(args) abort
         \ 'left_label': l:spec.left_label,
         \ 'right_ref': l:spec.right,
         \ 'right_label': l:spec.right_label,
+        \ 'log_win': 0, 'tree_win': 0, 'left_win': 0, 'right_win': 0,
         \ }
+  call s:ShowTree(l:files)
+endfunction
 
-  " the window created by :tabnew becomes the left diff window
-  let t:gtd.left_win = win_getid()
-  rightbelow vertical new
-  let t:gtd.right_win = win_getid()
+" Create (or refresh) the tree window and the two diff windows for the
+" file list in a:files, using the refs stored in t:gtd.  The tree window is
+" placed right of the log window if one exists, otherwise at the far left.
+function! s:ShowTree(files) abort
+  if !win_id2win(t:gtd.tree_win)
+    if win_id2win(t:gtd.log_win)
+      call win_gotoid(t:gtd.log_win)
+      rightbelow vertical new
+    endif
+    " without a log window the current (new tab) window becomes the tree
+    let t:gtd.tree_win = win_getid()
+  endif
+  call win_gotoid(t:gtd.tree_win)
+  silent enew
+  call s:SetupTreeBuffer(a:files)
+  call s:EnsureWindows()
 
-  " tree window on the far left
-  execute 'topleft vertical ' . get(g:, 'git_tree_diff_width', 34) . 'new'
-  let t:gtd.tree_win = win_getid()
-  call s:SetupTreeBuffer(l:files)
+  if win_id2win(t:gtd.log_win)
+    call win_gotoid(t:gtd.log_win)
+    execute 'vertical resize ' . get(g:, 'git_tree_diff_log_width', 50)
+  endif
+  call win_gotoid(t:gtd.tree_win)
+  execute 'vertical resize ' . get(g:, 'git_tree_diff_width', 34)
   wincmd =
 
   " automatically show the diff of the first file
@@ -241,16 +258,16 @@ function! git_tree_diff#select() abort
       silent! normal! zc
     endif
   else
-    call s:MarkSelected()
+    call s:MarkSelected(line('.'))
     call s:OpenDiff(l:entry.path)
   endif
 endfunction
 
-function! s:MarkSelected() abort
+function! s:MarkSelected(lnum) abort
   if exists('w:gtd_match')
     silent! call matchdelete(w:gtd_match)
   endif
-  let w:gtd_match = matchaddpos('GitTreeDiffSelected', [line('.')])
+  let w:gtd_match = matchaddpos('GitTreeDiffSelected', [a:lnum])
 endfunction
 
 " Recreate the two diff windows in case the user closed one of them.
@@ -323,4 +340,112 @@ function! s:LoadVersion(ref, label, path) abort
   execute 'silent! file ' . fnameescape('gtd://' . a:label . '/' . a:path)
   filetype detect
   setlocal nomodifiable
+endfunction
+
+" ---------------------------------------------------------------------------
+" log browser (:FGitLog)
+" ---------------------------------------------------------------------------
+
+function! git_tree_diff#log(arg) abort
+  let l:arg = trim(a:arg)
+  if l:arg !=# '' && l:arg !=# 'all'
+    echohl ErrorMsg
+    echomsg 'git-tree-diff: FGitLog only accepts the optional argument "all"'
+    echohl None
+    return
+  endif
+
+  let l:root = s:FindRoot()
+  if empty(l:root)
+    echohl ErrorMsg | echomsg 'git-tree-diff: not inside a git repository' | echohl None
+    return
+  endif
+
+  let [l:err, l:out] = s:Git(l:root,
+        \ 'log --graph --decorate' . (l:arg ==# 'all' ? ' --all' : ''))
+  if l:err
+    echohl ErrorMsg
+    echomsg 'git-tree-diff: git log failed: ' . join(l:out, ' ')
+    echohl None
+    return
+  endif
+
+  tabnew
+  let t:gtd = {
+        \ 'root': l:root,
+        \ 'log_win': win_getid(),
+        \ 'tree_win': 0, 'left_win': 0, 'right_win': 0,
+        \ }
+  call s:SetupLogBuffer(l:out)
+endfunction
+
+function! git_tree_diff#log_complete(arglead, cmdline, cursorpos) abort
+  return filter(['all'], 'v:val =~# "^" . a:arglead')
+endfunction
+
+function! s:SetupLogBuffer(lines) abort
+  setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
+  setlocal nonumber norelativenumber nowrap nolist nospell
+  setlocal winfixwidth cursorline signcolumn=no
+  call setline(1, a:lines)
+  setlocal nomodifiable
+  silent! file gtd://log
+
+  setlocal filetype=gittreedifflog
+
+  nnoremap <buffer> <silent> <CR> :call git_tree_diff#log_select()<CR>
+  nnoremap <buffer> <silent> o :call git_tree_diff#log_select()<CR>
+  nnoremap <buffer> <silent> <2-LeftMouse> :call git_tree_diff#log_select()<CR>
+  nnoremap <buffer> <silent> <C-n> :call search('\<commit \x\{40}\>', 'W')<CR>
+  nnoremap <buffer> <silent> <C-p> :call search('\<commit \x\{40}\>', 'bW')<CR>
+  nnoremap <buffer> <silent> q :tabclose<CR>
+endfunction
+
+" Show the file tree and diff windows for the commit on or above the cursor.
+function! git_tree_diff#log_select() abort
+  if !exists('t:gtd')
+    return
+  endif
+  " the commit line at or above the cursor
+  let l:lnum = line('.')
+  if getline(l:lnum) !~# '\<commit \x\{40}\>'
+    let l:lnum = search('\<commit \x\{40}\>', 'bnW')
+    if !l:lnum
+      return
+    endif
+  endif
+  let l:sha = matchstr(getline(l:lnum), '\<commit \zs\x\{40}\>')
+  let l:origin = win_getid()
+  call s:MarkSelected(l:lnum)
+  call s:ShowCommit(l:sha)
+  call win_gotoid(l:origin)
+endfunction
+
+function! s:ShowCommit(sha) abort
+  " diff the commit against its (first) parent; a root commit is diffed
+  " against the empty tree
+  let [l:err, l:out] = s:Git(t:gtd.root,
+        \ 'rev-parse --verify --quiet ' . shellescape(a:sha . '^'))
+  if l:err
+    let [l:err2, l:et] = s:Git(t:gtd.root, 'hash-object -t tree /dev/null')
+    let l:parent = l:et[0]
+    let l:parent_label = 'none'
+  else
+    let l:parent = l:out[0]
+    let l:parent_label = strpart(l:parent, 0, 10)
+  endif
+
+  let [l:err, l:files] = s:Git(t:gtd.root, 'diff --name-only '
+        \ . shellescape(l:parent) . ' ' . shellescape(a:sha))
+  call filter(l:files, '!empty(v:val)')
+  if empty(l:files)
+    echomsg 'git-tree-diff: no differences in ' . strpart(a:sha, 0, 10)
+    return
+  endif
+
+  let t:gtd.left_ref = l:parent
+  let t:gtd.left_label = l:parent_label
+  let t:gtd.right_ref = a:sha
+  let t:gtd.right_label = strpart(a:sha, 0, 10)
+  call s:ShowTree(l:files)
 endfunction

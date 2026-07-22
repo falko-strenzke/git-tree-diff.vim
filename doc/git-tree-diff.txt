@@ -7,9 +7,10 @@ License: same as the repository (see LICENSE)
 CONTENTS                                                *git-tree-diff-contents*
 
     1. Introduction ................. |git-tree-diff-introduction|
-    2. Command ...................... |git-tree-diff-command|
+    2. Commands ..................... |git-tree-diff-commands|
     3. Tree window .................. |git-tree-diff-tree|
-    4. Configuration ................ |git-tree-diff-configuration|
+    4. Log window ................... |git-tree-diff-log|
+    5. Configuration ................ |git-tree-diff-configuration|
 
 ==============================================================================
 1. INTRODUCTION                                     *git-tree-diff-introduction*
@@ -19,7 +20,7 @@ tree.  Selecting a file in the tree opens the two compared versions of that
 file in two equally sized windows in Vim's usual |diff-mode|.
 
 ==============================================================================
-2. COMMAND                                               *git-tree-diff-command*
+2. COMMANDS                                             *git-tree-diff-commands*
 
                                                                 *:FGitTreeDiff*
 :FGitTreeDiff [args]
@@ -42,6 +43,18 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     scratch buffers named gtd://{rev}/{path}.  When one side is the working
     tree, the actual file is edited, so changes can be made and saved.
 
+                                                                     *:FGitLog*
+:FGitLog [all]
+    Open a new tab page with a browsable commit log based on the output of
+    'git log --graph --decorate'.  With the optional argument "all",
+    '--all' is appended to the git command.
+
+    Pressing <CR> on a commit shows - right of the log window and created
+    on first use - the file tree of that commit's changes and the two diff
+    windows, exactly as for |:FGitTreeDiff|.  The commit is compared
+    against its first parent; a root commit is compared against the empty
+    tree.  Selecting another commit reuses the same windows.
+
 ==============================================================================
 3. TREE WINDOW                                              *git-tree-diff-tree*
 
@@ -57,10 +70,31 @@ Mappings in the tree window:
     q               Close the tab page.
 
 ==============================================================================
-4. CONFIGURATION                                   *git-tree-diff-configuration*
+4. LOG WINDOW                                                *git-tree-diff-log*
+
+The log window shows the raw 'git log --graph --decorate' output.  Commits
+can be navigated with the usual motions.
+
+Mappings in the log window:
+
+    <CR>            Show the file tree and diffs for the commit on or
+                    above the cursor.
+    o               Same as <CR>.
+    <2-LeftMouse>   Same as <CR>.
+    <C-n>           Jump to the next commit line.
+    <C-p>           Jump to the previous commit line.
+    q               Close the tab page.
+
+==============================================================================
+5. CONFIGURATION                                   *git-tree-diff-configuration*
 
                                                         *g:git_tree_diff_width*
 g:git_tree_diff_width
     Width of the tree window in columns.  Default: 34
+
+                                                    *g:git_tree_diff_log_width*
+g:git_tree_diff_log_width
+    Width of the log window in columns once the tree and diff windows are
+    shown.  Default: 50
 
  vim:tw=78:ts=8:ft=help:norl:

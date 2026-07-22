@@ -21,12 +21,34 @@ invocation.
 :FGitTreeDiff HEAD -- src/       " limit to a path
 ```
 
+`:FGitLog` opens a new tab page with a browsable commit log based on
+`git log --graph --decorate` (with the optional argument `all`, `--all` is
+appended). Pressing `<CR>` on a commit shows — right of the log window and
+created on first use — the file tree of that commit's changes and the two
+diff windows, exactly as for `:FGitTreeDiff`. The commit is compared against
+its first parent (a root commit against the empty tree); selecting another
+commit reuses the same windows.
+
+```vim
+:FGitLog                         " log of the current branch
+:FGitLog all                     " git log --graph --decorate --all
+```
+
 ## Tree window mappings
 
 | Key             | Action                                             |
 |-----------------|----------------------------------------------------|
 | `<CR>` / `o`    | Open diff for file / toggle fold for directory     |
 | `<2-LeftMouse>` | Same as `<CR>`                                     |
+| `q`             | Close the tab page                                 |
+
+## Log window mappings
+
+| Key             | Action                                             |
+|-----------------|----------------------------------------------------|
+| `<CR>` / `o`    | Show tree and diffs for the commit under the cursor|
+| `<2-LeftMouse>` | Same as `<CR>`                                     |
+| `<C-n>` / `<C-p>` | Jump to next / previous commit                   |
 | `q`             | Close the tab page                                 |
 
 Versions taken from a git revision or the index are shown in read-only
@@ -50,8 +72,9 @@ Plug 'fstrenzke/git-tree-diff.vim'
 
 ## Configuration
 
-| Variable                | Default | Description                   |
-|-------------------------|---------|-------------------------------|
-| `g:git_tree_diff_width` | `34`    | Width of the tree window      |
+| Variable                    | Default | Description                          |
+|-----------------------------|---------|--------------------------------------|
+| `g:git_tree_diff_width`     | `34`    | Width of the tree window             |
+| `g:git_tree_diff_log_width` | `50`    | Width of the log window (`:FGitLog`) |
 
 See `:help git-tree-diff` for details.
