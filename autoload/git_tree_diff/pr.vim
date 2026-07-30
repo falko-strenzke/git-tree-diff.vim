@@ -587,6 +587,13 @@ function! s:ShowComment(idx) abort
     call extend(l:lines, split(l:m.body, '\r\?\n', 1))
   endfor
 
+  call s:FillCommentWin(l:lines, 'gtd-pr://comment/' . l:root_id, [])
+endfunction
+
+" Show a:lines in the comment window.  a:conv, when non-empty, is a per-line
+" list mapping each buffer line to the comment it belongs to (used by the
+" conversation view to resolve "the comment under the cursor").
+function! s:FillCommentWin(lines, name, conv) abort
   call s:EnsureCommentWin()
   let l:cur = win_getid()
   call win_gotoid(t:gtd_pr.comment_win)
@@ -594,13 +601,44 @@ function! s:ShowComment(idx) abort
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   setlocal wrap linebreak nonumber norelativenumber nolist
   setlocal winfixwidth nofoldenable
-  call setline(1, l:lines)
-  execute 'silent! file ' . fnameescape('gtd-pr://comment/' . l:root_id)
+  call setline(1, a:lines)
+  if !empty(a:conv)
+    let b:gtd_pr_conv = a:conv
+  endif
+  execute 'silent! file ' . fnameescape(a:name)
   setlocal filetype=markdown
   setlocal nomodifiable
   nnoremap <buffer> <silent> q :close<CR>
   nnoremap <buffer> <silent> r :FGitPrReply<CR>
   call win_gotoid(l:cur)
+endfunction
+
+" Show all comments of the pull request in chronological order in the
+" comment window (:FGitPrOpenConversation).
+function! git_tree_diff#pr#open_conversation() abort
+  if !exists('t:gtd_pr')
+    return s:Error('no pull request open in this tab (use :FGitPrList)')
+  endif
+  let l:conv = sort(copy(t:gtd_pr.comments), function('s:CompareTime'))
+  let l:lines = ['# PR #' . t:gtd_pr.number . ' · conversation']
+  let l:map = [{}]
+  for l:c in l:conv
+    let l:where = l:c.kind ==# 'review' && !empty(l:c.path)
+          \ ? ' · ' . l:c.path . (l:c.line > 0 ? ':' . l:c.line : '') : ''
+    let l:block = ['', '## @' . l:c.user . ' · ' . l:c.time . l:where, '']
+    call extend(l:block, split(l:c.body, '\r\?\n', 1))
+    call extend(l:lines, l:block)
+    call extend(l:map, map(l:block, 'l:c'))
+  endfor
+  call s:FillCommentWin(l:lines, 'gtd-pr://conversation', l:map)
+  call win_gotoid(t:gtd_pr.comment_win)
+endfunction
+
+function! s:CompareTime(a, b) abort
+  if a:a.time !=# a:b.time
+    return a:a.time <# a:b.time ? -1 : 1
+  endif
+  return a:a.id == a:b.id ? 0 : a:a.id < a:b.id ? -1 : 1
 endfunction
 
 " ---------------------------------------------------------------------------
@@ -769,10 +807,14 @@ endfunction
 " ---------------------------------------------------------------------------
 
 " The comment the user currently refers to: the comment under the cursor in
-" the comment list, or the (root of the) comment shown in the comment window.
+" the comment list or in the conversation view, or the (root of the) comment
+" shown in the comment window.
 function! s:SelectedComment() abort
   if !exists('t:gtd_pr')
     return {}
+  endif
+  if exists('b:gtd_pr_conv')
+    return get(b:gtd_pr_conv, line('.') - 1, {})
   endif
   if exists('b:gtd_pr_clist')
     let l:idx = get(b:gtd_pr_clist, line('.') - 1, -1)

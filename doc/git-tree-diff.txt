@@ -90,11 +90,19 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     Add a new comment to the pull request conversation.  The comment is
     written in a new markdown buffer; |:write| sends it to GitHub.
 
+                                                       *:FGitPrOpenConversation*
+:FGitPrOpenConversation
+    Show all comments of the pull request in chronological order in the
+    comment window and move the cursor there.  Review comments carry their
+    file location in the header.  The link commands below, "r" and
+    |:FGitPrReply| act on the comment under the cursor.
+
                                                           *:FGitPrBrowseComment*
 :FGitPrBrowseComment
     Open the GitHub page of the selected comment (the comment under the
-    cursor in the comment list, or the one shown in the comment window) in
-    the web browser, see |g:git_tree_diff_browser|.
+    cursor in the comment list or in the conversation view, or the one
+    shown in the comment window) in the web browser, see
+    |g:git_tree_diff_browser|.
 
                                                         *:FGitPrCommentCopyLink*
 :FGitPrCommentCopyLink

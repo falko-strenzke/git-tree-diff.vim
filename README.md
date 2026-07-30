@@ -62,6 +62,7 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrReply`          | Reply to the selected comment                     |
 | `:FGitPrNewComment`     | Add a new comment to the PR conversation          |
 | `:FGitPrCheckoutBranch` | Check out the branch of the selected PR           |
+| `:FGitPrOpenConversation` | Show the full conversation in the comment window |
 | `:FGitPrBrowseComment`  | Open the selected comment on GitHub               |
 | `:FGitPrCommentCopyLink`| Copy the selected comment's GitHub link           |
 
