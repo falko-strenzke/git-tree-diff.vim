@@ -11,6 +11,7 @@ highlight default link GitTreeDiffSelected Visual
 highlight default link GitTreeDiffPrAddSign DiffAdd
 highlight default link GitTreeDiffPrDelSign DiffDelete
 highlight default link GitTreeDiffPrCommentSign Search
+highlight default link GitTreeDiffPrCommentDoneSign Comment
 highlight default GitTreeDiffPrLocalSign ctermfg=Red guifg=Red
 
 if exists('*sign_define')
@@ -20,6 +21,8 @@ if exists('*sign_define')
         \ {'text': '▁', 'texthl': 'GitTreeDiffPrDelSign'})
   call sign_define('GitTreeDiffPrComment',
         \ {'text': 'C', 'texthl': 'GitTreeDiffPrCommentSign'})
+  call sign_define('GitTreeDiffPrCommentDone',
+        \ {'text': 'C', 'texthl': 'GitTreeDiffPrCommentDoneSign'})
   call sign_define('GitTreeDiffPrLocal',
         \ {'text': '┃', 'texthl': 'GitTreeDiffPrLocalSign'})
   call sign_define('GitTreeDiffPrLocalDel',
@@ -42,3 +45,5 @@ command! FGitPrCommentsToggle call git_tree_diff#pr#comments_toggle()
 command! FGitPrReply call git_tree_diff#pr#reply()
 command! FGitPrNewComment call git_tree_diff#pr#new_comment()
 command! FGitPrCheckoutBranch call git_tree_diff#pr#checkout()
+command! FGitPrBrowseComment call git_tree_diff#pr#browse_comment()
+command! FGitPrCommentCopyLink call git_tree_diff#pr#copy_link()

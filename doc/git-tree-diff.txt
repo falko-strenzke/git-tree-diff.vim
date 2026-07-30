@@ -90,6 +90,18 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     Add a new comment to the pull request conversation.  The comment is
     written in a new markdown buffer; |:write| sends it to GitHub.
 
+                                                          *:FGitPrBrowseComment*
+:FGitPrBrowseComment
+    Open the GitHub page of the selected comment (the comment under the
+    cursor in the comment list, or the one shown in the comment window) in
+    the web browser, see |g:git_tree_diff_browser|.
+
+                                                        *:FGitPrCommentCopyLink*
+:FGitPrCommentCopyLink
+    Copy the GitHub link of the selected comment (as for
+    |:FGitPrBrowseComment|) to the clipboard (the + and * registers, and
+    the unnamed register).
+
                                                         *:FGitPrCheckoutBranch*
 :FGitPrCheckoutBranch
     Check out the branch of the selected pull request (the pull request of
@@ -144,7 +156,9 @@ pull request version of the file with these gutter signs:
 
     ┃ (GitTreeDiffPrAdd)      line added or changed by the pull request
     ▁ (GitTreeDiffPrDel)      lines were deleted above this line
-    C (GitTreeDiffPrComment)  the line has review comments
+    C (GitTreeDiffPrComment)  the line has unresolved review comments
+    C (GitTreeDiffPrCommentDone, dimmed)
+                              all review comments on the line are resolved
 
 If the pull request is checked out in the working tree - HEAD is the pull
 request head commit, or the current branch is the pull request branch
@@ -211,5 +225,11 @@ g:git_tree_diff_pr_comments_height
                                                        *g:git_tree_diff_gh_cmd*
 g:git_tree_diff_gh_cmd
     The 'gh' executable used for all GitHub access.  Default: "gh"
+
+                                                      *g:git_tree_diff_browser*
+g:git_tree_diff_browser
+    The command used by |:FGitPrBrowseComment| to open a URL.  When empty,
+    "open" (macOS), "start" (Windows) or "xdg-open" (elsewhere) is used.
+    Default: ""
 
  vim:tw=78:ts=8:ft=help:norl:

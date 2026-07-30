@@ -236,6 +236,7 @@ function! s:FetchComments(root, nwo, number) abort
     for l:c in l:list
       let l:line = s:Num(l:c, 'line')
       let l:path = get(l:c, 'path', '')
+      let l:url = get(l:c, 'html_url', '')
       call add(l:comments, {
             \ 'kind': l:kind,
             \ 'id': l:c.id,
@@ -245,6 +246,7 @@ function! s:FetchComments(root, nwo, number) abort
             \ 'user': get(get(l:c, 'user', {}), 'login', '?'),
             \ 'time': s:FmtTime(get(l:c, 'created_at', '')),
             \ 'body': get(l:c, 'body', ''),
+            \ 'url': type(l:url) == v:t_string ? l:url : '',
             \ })
     endfor
   endfor
@@ -458,15 +460,20 @@ function! s:PlaceSigns(buf, path) abort
       endif
     endfor
   endif
-  let l:done = {}
+  " one comment sign per line; lines where every thread is resolved get the
+  " dimmed variant
+  let l:clines = {}
   for l:c in t:gtd_pr.comments
     if l:c.kind ==# 'review' && l:c.path ==# a:path
           \ && l:c.line > 0 && l:c.line <= l:max
-          \ && !has_key(l:done, l:c.line)
-      let l:done[l:c.line] = 1
-      call sign_place(0, 'gtdpr', 'GitTreeDiffPrComment', a:buf,
-            \ {'lnum': l:c.line, 'priority': 20})
+      let l:clines[l:c.line] = get(l:clines, l:c.line, 0)
+            \ || !get(l:c, 'resolved', 0)
     endif
+  endfor
+  for [l:lnum, l:unresolved] in items(l:clines)
+    call sign_place(0, 'gtdpr',
+          \ l:unresolved ? 'GitTreeDiffPrComment' : 'GitTreeDiffPrCommentDone',
+          \ a:buf, {'lnum': str2nr(l:lnum), 'priority': l:unresolved ? 20 : 12})
   endfor
   " for a checked-out working tree file, mark local modifications relative
   " to the pull request head in red
@@ -761,25 +768,85 @@ endfunction
 " composing comments (:FGitPrReply / :FGitPrNewComment)
 " ---------------------------------------------------------------------------
 
+" The comment the user currently refers to: the comment under the cursor in
+" the comment list, or the (root of the) comment shown in the comment window.
+function! s:SelectedComment() abort
+  if !exists('t:gtd_pr')
+    return {}
+  endif
+  if exists('b:gtd_pr_clist')
+    let l:idx = get(b:gtd_pr_clist, line('.') - 1, -1)
+    return l:idx >= 0 ? t:gtd_pr.comments[l:idx] : {}
+  endif
+  if !empty(t:gtd_pr.current)
+    for l:c in t:gtd_pr.comments
+      if l:c.kind ==# t:gtd_pr.current.kind && l:c.id == t:gtd_pr.current.id
+        return l:c
+      endif
+    endfor
+  endif
+  return {}
+endfunction
+
 function! git_tree_diff#pr#reply() abort
   if !exists('t:gtd_pr')
     return s:Error('no pull request open in this tab (use :FGitPrList)')
   endif
-  let l:target = {}
-  if exists('b:gtd_pr_clist')
-    let l:idx = get(b:gtd_pr_clist, line('.') - 1, -1)
-    if l:idx >= 0
-      let l:c = t:gtd_pr.comments[l:idx]
-      let l:target = {'kind': l:c.kind,
-            \ 'id': l:c.reply_to != 0 ? l:c.reply_to : l:c.id}
-    endif
-  elseif !empty(t:gtd_pr.current)
-    let l:target = t:gtd_pr.current
-  endif
-  if empty(l:target)
+  let l:c = s:SelectedComment()
+  if empty(l:c)
     return s:Error('no comment selected (open a comment first)')
   endif
-  call s:Compose('reply', l:target)
+  call s:Compose('reply', {'kind': l:c.kind,
+        \ 'id': l:c.reply_to != 0 ? l:c.reply_to : l:c.id})
+endfunction
+
+" ---------------------------------------------------------------------------
+" comment links (:FGitPrBrowseComment / :FGitPrCommentCopyLink)
+" ---------------------------------------------------------------------------
+
+function! s:SelectedCommentUrl() abort
+  let l:c = s:SelectedComment()
+  if empty(l:c)
+    call s:Error('no comment selected (open a comment first)')
+    return ''
+  endif
+  if empty(get(l:c, 'url', ''))
+    call s:Error('the selected comment has no link')
+    return ''
+  endif
+  return l:c.url
+endfunction
+
+function! git_tree_diff#pr#browse_comment() abort
+  let l:url = s:SelectedCommentUrl()
+  if empty(l:url)
+    return
+  endif
+  let l:browser = get(g:, 'git_tree_diff_browser', '')
+  if empty(l:browser)
+    if has('mac') || has('macunix')
+      let l:browser = 'open'
+    elseif has('win32') || has('win64')
+      let l:browser = 'start ""'
+    else
+      let l:browser = 'xdg-open'
+    endif
+  endif
+  call system(l:browser . ' ' . shellescape(l:url) . ' &')
+  echomsg 'git-tree-diff: opened ' . l:url
+endfunction
+
+function! git_tree_diff#pr#copy_link() abort
+  let l:url = s:SelectedCommentUrl()
+  if empty(l:url)
+    return
+  endif
+  if has('clipboard')
+    call setreg('+', l:url)
+    call setreg('*', l:url)
+  endif
+  call setreg('"', l:url)
+  echomsg 'git-tree-diff: copied ' . l:url
 endfunction
 
 function! git_tree_diff#pr#new_comment() abort

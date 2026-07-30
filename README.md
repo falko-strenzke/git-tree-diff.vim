@@ -45,7 +45,8 @@ files on the left — like GitHub's "Files changed" view, with a `C` gutter
 mark on files that have unresolved review comments — and a file window on
 the right. Opening a file from the tree shows the pull request version
 of the file with gutter signs: `┃` for added/changed lines, `▁` where lines
-were deleted, and `C` on lines that have review comments. If the pull
+were deleted, and `C` on lines that have review comments (dimmed when all
+threads on the line are resolved). If the pull
 request is checked out (HEAD is the PR head commit, or the current branch
 is the PR branch — possibly with additional local commits on top), the
 real file is edited — even with local unstaged or uncommitted changes — so
@@ -61,6 +62,8 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrReply`          | Reply to the selected comment                     |
 | `:FGitPrNewComment`     | Add a new comment to the PR conversation          |
 | `:FGitPrCheckoutBranch` | Check out the branch of the selected PR           |
+| `:FGitPrBrowseComment`  | Open the selected comment on GitHub               |
+| `:FGitPrCommentCopyLink`| Copy the selected comment's GitHub link           |
 
 Comments are displayed as markdown in a window at the far right (`q`
 closes it, `r` starts a reply). The comment list shows every comment with
@@ -115,5 +118,6 @@ Plug 'fstrenzke/git-tree-diff.vim'
 | `g:git_tree_diff_pr_comment_width`   | `50`    | Width of the PR comment window         |
 | `g:git_tree_diff_pr_comments_height` | `12`    | Height of the PR comment list window   |
 | `g:git_tree_diff_gh_cmd`             | `"gh"`  | The `gh` executable for GitHub access  |
+| `g:git_tree_diff_browser`            | `""`    | Browser command (`""` = OS default)    |
 
 See `:help git-tree-diff` for details.
