@@ -122,6 +122,16 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     comments of the pull request cannot be resolved.  Afterwards the
     gutter signs and the comment list are refreshed.
 
+                                                    *:FGitPrCommentAutoOpenOn*
+                                                   *:FGitPrCommentAutoOpenOff*
+:FGitPrCommentAutoOpenOn
+:FGitPrCommentAutoOpenOff
+    Enable or disable automatic comment opening for the current pull
+    request (all its code windows): whenever the cursor lands on a line
+    with an unresolved review conversation (a bright "C" marker), that
+    conversation is opened in the comment window automatically.  Resolved
+    conversations are skipped; open them with |:FGitPrOpenComment|.
+
                                                         *:FGitPrCheckoutBranch*
 :FGitPrCheckoutBranch
     Check out the branch of the selected pull request (the pull request of

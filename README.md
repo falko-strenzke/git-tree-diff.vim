@@ -67,6 +67,7 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrCommentCopyLink`| Copy the selected comment's GitHub link           |
 | `:FGitPrResolve`        | Resolve the selected review conversation          |
 | `:FGitPrUnresolve`      | Unresolve the selected review conversation        |
+| `:FGitPrCommentAutoOpenOn` / `...Off` | Auto-open the conversation under the cursor |
 
 Comments are displayed as markdown in a window at the far right (`q`
 closes it, `r` starts a reply); for review comments the first line states

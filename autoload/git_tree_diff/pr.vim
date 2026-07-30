@@ -748,6 +748,52 @@ function! s:CompareTime(a, b) abort
 endfunction
 
 " ---------------------------------------------------------------------------
+" automatic comment opening (:FGitPrCommentAutoOpenOn / Off)
+" ---------------------------------------------------------------------------
+
+" The setting is per pull request (tab) and applies to all code windows of
+" that pull request.
+function! git_tree_diff#pr#auto_open(on) abort
+  if !exists('t:gtd_pr')
+    return s:Error('no pull request open in this tab (use :FGitPrList)')
+  endif
+  let t:gtd_pr.auto_open = a:on
+  let t:gtd_pr.auto_open_last = ['', 0]
+  if a:on
+    augroup gtdpr_auto_open
+      autocmd!
+      autocmd CursorMoved * call git_tree_diff#pr#auto_open_check()
+    augroup END
+    call git_tree_diff#pr#auto_open_check()
+  endif
+  echomsg 'git-tree-diff: automatic comment opening '
+        \ . (a:on ? 'enabled' : 'disabled')
+endfunction
+
+function! git_tree_diff#pr#auto_open_check() abort
+  if !exists('t:gtd_pr') || !get(t:gtd_pr, 'auto_open', 0)
+        \ || !exists('b:gtd_pr_path')
+    return
+  endif
+  " only react when the cursor moved to a different line
+  if get(t:gtd_pr, 'auto_open_last', ['', 0]) ==# [b:gtd_pr_path, line('.')]
+    return
+  endif
+  let t:gtd_pr.auto_open_last = [b:gtd_pr_path, line('.')]
+  for l:i in range(len(t:gtd_pr.comments))
+    let l:c = t:gtd_pr.comments[l:i]
+    " resolved conversations are skipped, matching the bright "C" markers
+    if l:c.kind ==# 'review' && l:c.path ==# b:gtd_pr_path
+          \ && l:c.line == line('.') && !get(l:c, 'resolved', 0)
+      let l:origin = win_getid()
+      call s:ShowComment(l:i)
+      call win_gotoid(l:origin)
+      return
+    endif
+  endfor
+endfunction
+
+" ---------------------------------------------------------------------------
 " comment list (:FGitPrCommentsOpen / Close / Toggle)
 " ---------------------------------------------------------------------------
 
