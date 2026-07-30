@@ -151,6 +151,11 @@ the bottom: first the conversation comments, then the review comments
 grouped by file and line.  Each comment is shown with a header (author,
 time, location; replies are marked with "↳") and a preview line.
 
+Opening a review comment from the list also jumps the file window to the
+commented code location: the commented file is opened if necessary (the
+tree selection follows), the cursor is put on the commented line, and any
+closed fold concealing that line is opened.
+
 Mappings in the pull request list and in the comment list:
 
     <CR>            Open the pull request / show the comment.

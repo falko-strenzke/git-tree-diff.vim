@@ -567,7 +567,45 @@ function! git_tree_diff#pr#comments_select() abort
   call git_tree_diff#mark_selected(line('.'))
   let l:origin = win_getid()
   call s:ShowComment(l:idx)
+  call s:JumpToCode(t:gtd_pr.comments[l:idx])
   call win_gotoid(l:origin)
+endfunction
+
+" Move the file window to the code location of comment a:c: switch it to the
+" commented file if necessary, put the cursor on the commented line and open
+" any folds concealing it.
+function! s:JumpToCode(c) abort
+  if a:c.kind !=# 'review' || empty(a:c.path) || a:c.line <= 0
+    return
+  endif
+  call s:EnsureFileWin()
+  if getbufvar(winbufnr(t:gtd_pr.file_win), 'gtd_pr_path', '') !=# a:c.path
+    let l:cur = win_getid()
+    call s:OpenFile(a:c.path)
+    call win_gotoid(l:cur)
+    call s:MarkTreeFile(a:c.path)
+  endif
+  call win_execute(t:gtd_pr.file_win, [
+        \ printf('call cursor(min([%d, line(''$'')]), 1)', a:c.line),
+        \ 'silent! normal! zv',
+        \ 'normal! zz'])
+endfunction
+
+" Select the given file in the tree window (cursor, highlight and folds).
+function! s:MarkTreeFile(path) abort
+  if !win_id2win(t:gtd_pr.tree_win)
+    return
+  endif
+  let l:map = getbufvar(winbufnr(t:gtd_pr.tree_win), 'gtd_map', [])
+  for l:i in range(len(l:map))
+    if !empty(l:map[l:i]) && !l:map[l:i].isdir && l:map[l:i].path ==# a:path
+      call win_execute(t:gtd_pr.tree_win, [
+            \ 'call cursor(' . (l:i + 1) . ', 1)',
+            \ 'silent! normal! zv',
+            \ 'call git_tree_diff#mark_selected(' . (l:i + 1) . ')'])
+      return
+    endif
+  endfor
 endfunction
 
 " ---------------------------------------------------------------------------

@@ -59,7 +59,9 @@ modified and saved.
 Comments are displayed as markdown in a window at the far right (`q`
 closes it, `r` starts a reply). The comment list shows every comment with
 an author/time header and a preview line; `<CR>` opens the comment,
-`<C-n>`/`<C-p>` jump between comments. Replies and new comments are
+`<C-n>`/`<C-p>` jump between comments. Opening a review comment from the
+list also jumps the file window to the commented line — switching the file
+and opening folds as needed. Replies and new comments are
 written in a markdown buffer and sent to GitHub with `:w`.
 
 ## Tree window mappings
