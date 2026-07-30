@@ -65,6 +65,8 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrOpenConversation` | Show the full conversation in the comment window |
 | `:FGitPrBrowseComment`  | Open the selected comment on GitHub               |
 | `:FGitPrCommentCopyLink`| Copy the selected comment's GitHub link           |
+| `:FGitPrResolve`        | Resolve the selected review conversation          |
+| `:FGitPrUnresolve`      | Unresolve the selected review conversation        |
 
 Comments are displayed as markdown in a window at the far right (`q`
 closes it, `r` starts a reply). The comment list shows every comment with

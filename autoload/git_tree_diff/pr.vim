@@ -250,12 +250,15 @@ function! s:FetchComments(root, nwo, number) abort
             \ })
     endfor
   endfor
-  " attach the resolution state of the review thread to each review comment
-  let l:resolved = s:FetchResolved(a:root, a:nwo, a:number)
+  " attach the resolution state and thread id of the review thread to each
+  " review comment
+  let l:threads = s:FetchThreads(a:root, a:nwo, a:number)
   for l:c in l:comments
     if l:c.kind ==# 'review'
       let l:root_id = l:c.reply_to != 0 ? l:c.reply_to : l:c.id
-      let l:c.resolved = get(l:resolved, l:root_id, 0)
+      let l:info = get(l:threads, l:root_id, {})
+      let l:c.resolved = get(l:info, 'resolved', 0)
+      let l:c.thread_id = get(l:info, 'thread_id', '')
     endif
   endfor
   " conversation comments first, then review comments grouped by file/line
@@ -264,9 +267,9 @@ function! s:FetchComments(root, nwo, number) abort
 endfunction
 
 " Thread resolution is only available via the GraphQL API.  Returns a map of
-" thread root comment id -> resolved (0/1); empty on failure, in which case
-" all threads count as unresolved.
-function! s:FetchResolved(root, nwo, number) abort
+" thread root comment id -> {'resolved': 0/1, 'thread_id': node id}; empty
+" on failure, in which case all threads count as unresolved.
+function! s:FetchThreads(root, nwo, number) abort
   let l:parts = split(a:nwo, '/')
   if len(l:parts) != 2
     return {}
@@ -274,7 +277,7 @@ function! s:FetchResolved(root, nwo, number) abort
   let l:q = 'query { repository(owner: "' . l:parts[0] . '", name: "'
         \ . l:parts[1] . '") { pullRequest(number: ' . a:number . ') {'
         \ . ' reviewThreads(first: 100) { nodes {'
-        \ . ' isResolved comments(first: 1) { nodes { databaseId }'
+        \ . ' id isResolved comments(first: 1) { nodes { databaseId }'
         \ . ' } } } } } }'
   let [l:err, l:data] = s:GhJson(a:root,
         \ 'api graphql -f query=' . shellescape(l:q))
@@ -287,10 +290,81 @@ function! s:FetchResolved(root, nwo, number) abort
   for l:thread in get(get(l:pr, 'reviewThreads', {}), 'nodes', [])
     let l:nodes = get(get(l:thread, 'comments', {}), 'nodes', [])
     if !empty(l:nodes)
-      let l:res[l:nodes[0].databaseId] = get(l:thread, 'isResolved', 0) ? 1 : 0
+      let l:res[l:nodes[0].databaseId] = {
+            \ 'resolved': get(l:thread, 'isResolved', 0) ? 1 : 0,
+            \ 'thread_id': get(l:thread, 'id', ''),
+            \ }
     endif
   endfor
   return l:res
+endfunction
+
+" Resolve or unresolve a review conversation (:FGitPrResolve and
+" :FGitPrUnresolve): the thread on the current line in a code window, or the
+" selected comment's thread elsewhere.
+function! git_tree_diff#pr#resolve() abort
+  call s:SetResolved(1)
+endfunction
+
+function! git_tree_diff#pr#unresolve() abort
+  call s:SetResolved(0)
+endfunction
+
+function! s:SetResolved(resolve) abort
+  if !exists('t:gtd_pr')
+    return s:Error('no pull request open in this tab (use :FGitPrList)')
+  endif
+  let l:verb = a:resolve ? 'resolved' : 'unresolved'
+  let l:c = {}
+  if exists('b:gtd_pr_path')
+    " code window: the first thread on this line that is not yet in the
+    " requested state
+    let l:other_seen = 0
+    for l:cand in t:gtd_pr.comments
+      if l:cand.kind ==# 'review' && l:cand.path ==# b:gtd_pr_path
+            \ && l:cand.line == line('.')
+        if get(l:cand, 'resolved', 0) != a:resolve
+          let l:c = l:cand
+          break
+        endif
+        let l:other_seen = 1
+      endif
+    endfor
+    if empty(l:c)
+      if l:other_seen
+        echomsg 'git-tree-diff: the conversation on this line is already '
+              \ . l:verb
+        return
+      endif
+      return s:Error('no PR comment on this line')
+    endif
+  else
+    let l:c = s:SelectedComment()
+    if empty(l:c)
+      return s:Error('no comment selected (open a comment first)')
+    endif
+  endif
+  if l:c.kind !=# 'review'
+    return s:Error('only review conversations can be ' . l:verb)
+  endif
+  if get(l:c, 'resolved', 0) == a:resolve
+    echomsg 'git-tree-diff: the conversation is already ' . l:verb
+    return
+  endif
+  if empty(get(l:c, 'thread_id', ''))
+    return s:Error('no thread id known for this conversation')
+  endif
+
+  let l:q = 'mutation { ' . (a:resolve ? 'resolve' : 'unresolve')
+        \ . 'ReviewThread(input: {threadId: "' . l:c.thread_id
+        \ . '"}) { thread { isResolved } } }'
+  let [l:err, l:out] = s:GhJson(t:gtd_pr.root,
+        \ 'api graphql -f query=' . shellescape(l:q))
+  if l:err
+    return s:Error('updating the conversation failed: ' . l:out)
+  endif
+  echomsg 'git-tree-diff: conversation ' . l:verb
+  call s:RefreshComments()
 endfunction
 
 function! s:CompareComments(a, b) abort

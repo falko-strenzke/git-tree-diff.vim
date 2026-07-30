@@ -110,6 +110,18 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     |:FGitPrBrowseComment|) to the clipboard (the + and * registers, and
     the unnamed register).
 
+                                                                *:FGitPrResolve*
+                                                              *:FGitPrUnresolve*
+:FGitPrResolve
+:FGitPrUnresolve
+    Resolve (or unresolve) a review conversation on GitHub.  The
+    conversation is chosen by context: in a code window the conversation
+    on the current line that is not yet in the requested state, in the
+    comment list or in the conversation view the comment under the cursor,
+    in the comment window the conversation shown there.  Conversation
+    comments of the pull request cannot be resolved.  Afterwards the
+    gutter signs and the comment list are refreshed.
+
                                                         *:FGitPrCheckoutBranch*
 :FGitPrCheckoutBranch
     Check out the branch of the selected pull request (the pull request of
