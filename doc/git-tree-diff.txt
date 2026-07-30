@@ -137,9 +137,10 @@ installed and authenticated (see 'gh auth login').
 
 |:FGitPrList| shows the open pull requests.  Opening one creates a new tab
 page with a foldable tree of the changed files on the left - like the
-GitHub "Files changed" view - and a file window on the right.  Opening a
-file from the tree shows the pull request version of the file with these
-gutter signs:
+GitHub "Files changed" view - and a file window on the right.  In the
+tree, files that have at least one unresolved review comment are marked
+with a "C" sign in the gutter.  Opening a file from the tree shows the
+pull request version of the file with these gutter signs:
 
     ┃ (GitTreeDiffPrAdd)      line added or changed by the pull request
     ▁ (GitTreeDiffPrDel)      lines were deleted above this line

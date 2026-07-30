@@ -41,8 +41,9 @@ authenticated).
 
 `:FGitPrList` lists the open GitHub pull requests of the repository.
 Opening one (`<CR>`) creates a new tab with a foldable tree of the changed
-files on the left — like GitHub's "Files changed" view — and a file window
-on the right. Opening a file from the tree shows the pull request version
+files on the left — like GitHub's "Files changed" view, with a `C` gutter
+mark on files that have unresolved review comments — and a file window on
+the right. Opening a file from the tree shows the pull request version
 of the file with gutter signs: `┃` for added/changed lines, `▁` where lines
 were deleted, and `C` on lines that have review comments. If the pull
 request is checked out (HEAD is the PR head commit, or the current branch

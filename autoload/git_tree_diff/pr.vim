@@ -146,6 +146,7 @@ function! s:OpenPr(root, number) abort
         \ 'file_win': 0, 'comment_win': 0, 'list_win': 0,
         \ }
   call s:SetupPrTreeBuffer()
+  call s:PlaceTreeSigns()
 
   " automatically show the first changed file
   for l:i in range(len(b:gtd_map))
@@ -247,9 +248,47 @@ function! s:FetchComments(root, nwo, number) abort
             \ })
     endfor
   endfor
+  " attach the resolution state of the review thread to each review comment
+  let l:resolved = s:FetchResolved(a:root, a:nwo, a:number)
+  for l:c in l:comments
+    if l:c.kind ==# 'review'
+      let l:root_id = l:c.reply_to != 0 ? l:c.reply_to : l:c.id
+      let l:c.resolved = get(l:resolved, l:root_id, 0)
+    endif
+  endfor
   " conversation comments first, then review comments grouped by file/line
   call sort(l:comments, function('s:CompareComments'))
   return l:comments
+endfunction
+
+" Thread resolution is only available via the GraphQL API.  Returns a map of
+" thread root comment id -> resolved (0/1); empty on failure, in which case
+" all threads count as unresolved.
+function! s:FetchResolved(root, nwo, number) abort
+  let l:parts = split(a:nwo, '/')
+  if len(l:parts) != 2
+    return {}
+  endif
+  let l:q = 'query { repository(owner: "' . l:parts[0] . '", name: "'
+        \ . l:parts[1] . '") { pullRequest(number: ' . a:number . ') {'
+        \ . ' reviewThreads(first: 100) { nodes {'
+        \ . ' isResolved comments(first: 1) { nodes { databaseId }'
+        \ . ' } } } } } }'
+  let [l:err, l:data] = s:GhJson(a:root,
+        \ 'api graphql -f query=' . shellescape(l:q))
+  if l:err
+    return {}
+  endif
+  let l:res = {}
+  let l:pr = get(get(get(l:data, 'data', {}), 'repository', {}),
+        \ 'pullRequest', {})
+  for l:thread in get(get(l:pr, 'reviewThreads', {}), 'nodes', [])
+    let l:nodes = get(get(l:thread, 'comments', {}), 'nodes', [])
+    if !empty(l:nodes)
+      let l:res[l:nodes[0].databaseId] = get(l:thread, 'isResolved', 0) ? 1 : 0
+    endif
+  endfor
+  return l:res
 endfunction
 
 function! s:CompareComments(a, b) abort
@@ -272,7 +311,7 @@ endfunction
 function! s:SetupPrTreeBuffer() abort
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   setlocal nonumber norelativenumber nowrap nolist nospell
-  setlocal winfixwidth cursorline signcolumn=no
+  setlocal winfixwidth cursorline signcolumn=auto
   setlocal shiftwidth=2 foldlevel=99
   setlocal foldmethod=expr foldexpr=git_tree_diff#foldexpr(v:lnum)
   setlocal foldtext=git_tree_diff#foldtext()
@@ -449,6 +488,30 @@ function! s:PlaceSigns(buf, path) abort
       endfor
     endif
   endif
+endfunction
+
+" Mark files with at least one unresolved review comment with a "C" sign in
+" the tree window.
+function! s:PlaceTreeSigns() abort
+  if !exists('*sign_place') || !win_id2win(t:gtd_pr.tree_win)
+    return
+  endif
+  let l:buf = winbufnr(t:gtd_pr.tree_win)
+  call sign_unplace('gtdpr', {'buffer': l:buf})
+  let l:paths = {}
+  for l:c in t:gtd_pr.comments
+    if l:c.kind ==# 'review' && !empty(l:c.path) && !get(l:c, 'resolved', 0)
+      let l:paths[l:c.path] = 1
+    endif
+  endfor
+  let l:map = getbufvar(l:buf, 'gtd_map', [])
+  for l:i in range(len(l:map))
+    if !empty(l:map[l:i]) && !l:map[l:i].isdir
+          \ && has_key(l:paths, l:map[l:i].path)
+      call sign_place(0, 'gtdpr', 'GitTreeDiffPrComment', l:buf,
+            \ {'lnum': l:i + 1, 'priority': 10})
+    endif
+  endfor
 endfunction
 
 " BufWritePost handler of checked-out pull request files: recompute the
@@ -794,6 +857,7 @@ function! s:RefreshComments() abort
   endif
   let t:gtd_pr.comments = s:FetchComments(t:gtd_pr.root, t:gtd_pr.nwo,
         \ t:gtd_pr.number)
+  call s:PlaceTreeSigns()
   if win_id2win(t:gtd_pr.file_win)
     let l:buf = winbufnr(t:gtd_pr.file_win)
     let l:path = getbufvar(l:buf, 'gtd_pr_path', '')
