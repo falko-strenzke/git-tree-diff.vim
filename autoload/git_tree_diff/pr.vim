@@ -333,17 +333,26 @@ function! s:OpenFile(path) abort
   let l:ref = l:info.deleted ? t:gtd_pr.base : t:gtd_pr.head
 
   " if the PR head is checked out, edit the real file so it can be modified
+  let l:full = t:gtd_pr.root . '/' . a:path
   let [l:err, l:head] = git_tree_diff#git(t:gtd_pr.root, 'rev-parse HEAD')
   if !l:info.deleted && !l:err && !empty(l:head)
         \ && l:head[0] ==# t:gtd_pr.head
-        \ && filereadable(t:gtd_pr.root . '/' . a:path)
-    try
-      execute 'silent edit ' . fnameescape(t:gtd_pr.root . '/' . a:path)
-    catch /E37\|E162/
-      echohl WarningMsg
-      echomsg 'git-tree-diff: buffer has unsaved changes; save it first'
-      echohl None
-    endtry
+        \ && filereadable(l:full)
+    " do not reload the file if it is already shown (it may have unsaved
+    " local changes)
+    if expand('%:p') !=# fnamemodify(l:full, ':p')
+      try
+        execute 'silent edit ' . fnameescape(l:full)
+      catch /E37\|E162/
+        echohl WarningMsg
+        echomsg 'git-tree-diff: buffer has unsaved changes; save it first'
+        echohl None
+      endtry
+    endif
+    augroup gtdpr_local
+      autocmd! * <buffer>
+      autocmd BufWritePost <buffer> call s:RefreshFileSigns()
+    augroup END
   else
     silent enew
     setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
@@ -408,6 +417,34 @@ function! s:PlaceSigns(buf, path) abort
             \ {'lnum': l:c.line, 'priority': 20})
     endif
   endfor
+  " for a checked-out working tree file, mark local modifications relative
+  " to the pull request head in red
+  if empty(getbufvar(a:buf, '&buftype'))
+    let [l:derr, l:dout] = git_tree_diff#git(t:gtd_pr.root,
+          \ 'diff ' . shellescape(t:gtd_pr.head) . ' -- ' . shellescape(a:path))
+    if !l:derr
+      let [l:_, l:lchanges] = s:ParseDiff(l:dout)
+      let l:linfo = get(l:lchanges, a:path, {})
+      for l:lnum in get(l:linfo, 'del', [])
+        call sign_place(0, 'gtdpr', 'GitTreeDiffPrLocalDel', a:buf,
+              \ {'lnum': min([l:lnum, l:max]), 'priority': 15})
+      endfor
+      for l:lnum in get(l:linfo, 'add', [])
+        if l:lnum <= l:max
+          call sign_place(0, 'gtdpr', 'GitTreeDiffPrLocal', a:buf,
+                \ {'lnum': l:lnum, 'priority': 15})
+        endif
+      endfor
+    endif
+  endif
+endfunction
+
+" BufWritePost handler of checked-out pull request files: recompute the
+" gutter signs after saving.
+function! s:RefreshFileSigns() abort
+  if exists('t:gtd_pr') && exists('b:gtd_pr_path')
+    call s:PlaceSigns(bufnr('%'), b:gtd_pr_path)
+  endif
 endfunction
 
 " ---------------------------------------------------------------------------

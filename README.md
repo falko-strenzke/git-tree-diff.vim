@@ -45,8 +45,10 @@ files on the left — like GitHub's "Files changed" view — and a file window
 on the right. Opening a file from the tree shows the pull request version
 of the file with gutter signs: `┃` for added/changed lines, `▁` where lines
 were deleted, and `C` on lines that have review comments. If the pull
-request branch is checked out, the real file is edited so it can be
-modified and saved.
+request head is the commit checked out in the working tree, the real file
+is edited — even with local unstaged or uncommitted changes — so it can be
+modified and saved; local modifications relative to the PR head version
+are marked in red in the gutter and recomputed on every save.
 
 | Command                 | Action                                            |
 |-------------------------|---------------------------------------------------|

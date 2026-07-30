@@ -11,6 +11,7 @@ highlight default link GitTreeDiffSelected Visual
 highlight default link GitTreeDiffPrAddSign DiffAdd
 highlight default link GitTreeDiffPrDelSign DiffDelete
 highlight default link GitTreeDiffPrCommentSign Search
+highlight default GitTreeDiffPrLocalSign ctermfg=Red guifg=Red
 
 if exists('*sign_define')
   call sign_define('GitTreeDiffPrAdd',
@@ -19,6 +20,10 @@ if exists('*sign_define')
         \ {'text': '▁', 'texthl': 'GitTreeDiffPrDelSign'})
   call sign_define('GitTreeDiffPrComment',
         \ {'text': 'C', 'texthl': 'GitTreeDiffPrCommentSign'})
+  call sign_define('GitTreeDiffPrLocal',
+        \ {'text': '┃', 'texthl': 'GitTreeDiffPrLocalSign'})
+  call sign_define('GitTreeDiffPrLocalDel',
+        \ {'text': '▁', 'texthl': 'GitTreeDiffPrLocalSign'})
 endif
 
 " All arguments are handed through to the underlying 'git diff' invocation.
