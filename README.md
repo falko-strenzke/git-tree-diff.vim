@@ -69,7 +69,10 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrUnresolve`      | Unresolve the selected review conversation        |
 
 Comments are displayed as markdown in a window at the far right (`q`
-closes it, `r` starts a reply). The comment list shows every comment with
+closes it, `r` starts a reply); for review comments the first line states
+whether the conversation is resolved, and the commented code line is
+highlighted while the comment is shown (style configurable via
+`g:git_tree_diff_pr_highlight_style`). The comment list shows every comment with
 an author/time header and a preview line; `<CR>` opens the comment,
 `<C-n>`/`<C-p>` jump between comments. Opening a review comment from the
 list also jumps the file window to the commented line — switching the file
@@ -122,5 +125,6 @@ Plug 'fstrenzke/git-tree-diff.vim'
 | `g:git_tree_diff_pr_comments_height` | `12`    | Height of the PR comment list window   |
 | `g:git_tree_diff_gh_cmd`             | `"gh"`  | The `gh` executable for GitHub access  |
 | `g:git_tree_diff_browser`            | `""`    | Browser command (`""` = OS default)    |
+| `g:git_tree_diff_pr_highlight_style` | `"underline"` | Commented-line highlight: `underline`, `italic`, `background` |
 
 See `:help git-tree-diff` for details.

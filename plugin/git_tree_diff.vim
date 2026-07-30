@@ -14,6 +14,18 @@ highlight default link GitTreeDiffPrCommentSign Search
 highlight default link GitTreeDiffPrCommentDoneSign Comment
 highlight default GitTreeDiffPrLocalSign ctermfg=Red guifg=Red
 
+" Highlight of the commented code line while its comment is shown, see
+" g:git_tree_diff_pr_highlight_style.
+let s:style = get(g:, 'git_tree_diff_pr_highlight_style', 'underline')
+if s:style ==# 'italic'
+  highlight default GitTreeDiffPrCommentLine cterm=italic gui=italic
+elseif s:style ==# 'background'
+  highlight default link GitTreeDiffPrCommentLine CursorColumn
+else
+  highlight default GitTreeDiffPrCommentLine cterm=underline gui=underline
+endif
+unlet s:style
+
 if exists('*sign_define')
   call sign_define('GitTreeDiffPrAdd',
         \ {'text': '┃', 'texthl': 'GitTreeDiffPrAddSign'})

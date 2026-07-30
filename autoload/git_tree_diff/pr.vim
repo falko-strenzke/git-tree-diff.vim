@@ -443,6 +443,11 @@ endfunction
 function! s:OpenFile(path) abort
   call s:EnsureFileWin()
   call win_gotoid(t:gtd_pr.file_win)
+  " a comment-line highlight would not fit the newly shown file
+  if exists('w:gtd_pr_line_match')
+    silent! call matchdelete(w:gtd_pr_line_match)
+    unlet w:gtd_pr_line_match
+  endif
   let l:info = get(t:gtd_pr.changes, a:path,
         \ {'add': [], 'del': [], 'deleted': 0})
   " a deleted file only exists on the base side
@@ -655,13 +660,40 @@ function! s:ShowComment(idx) abort
 
   let l:where = l:c.kind ==# 'issue' ? 'conversation'
         \ : l:c.path . (l:c.line > 0 ? ':' . l:c.line : '')
-  let l:lines = ['# PR #' . t:gtd_pr.number . ' · ' . l:where]
+  let l:title = '# PR #' . t:gtd_pr.number . ' · ' . l:where
+  if l:c.kind ==# 'review'
+    let l:title .= ' · ' . (get(l:c, 'resolved', 0) ? 'resolved' : 'unresolved')
+  endif
+  let l:lines = [l:title]
   for l:m in l:thread
     call extend(l:lines, ['', '## @' . l:m.user . ' · ' . l:m.time, ''])
     call extend(l:lines, split(l:m.body, '\r\?\n', 1))
   endfor
 
   call s:FillCommentWin(l:lines, 'gtd-pr://comment/' . l:root_id, [])
+  call s:HighlightCommentLine(l:c)
+endfunction
+
+" While a comment is shown, highlight the commented line in the code window
+" if that window currently shows the commented file.
+function! s:HighlightCommentLine(c) abort
+  if !win_id2win(t:gtd_pr.file_win)
+    return
+  endif
+  call win_execute(t:gtd_pr.file_win, [
+        \ 'if exists("w:gtd_pr_line_match")',
+        \ '  silent! call matchdelete(w:gtd_pr_line_match)',
+        \ '  unlet w:gtd_pr_line_match',
+        \ 'endif'])
+  let l:buf = winbufnr(t:gtd_pr.file_win)
+  let l:max = get(get(getbufinfo(l:buf), 0, {}), 'linecount', 0)
+  if a:c.kind ==# 'review' && !empty(a:c.path)
+        \ && a:c.line > 0 && a:c.line <= l:max
+        \ && getbufvar(l:buf, 'gtd_pr_path', '') ==# a:c.path
+    call win_execute(t:gtd_pr.file_win,
+          \ 'let w:gtd_pr_line_match = '
+          \ . 'matchaddpos("GitTreeDiffPrCommentLine", [' . a:c.line . '])')
+  endif
 endfunction
 
 " Show a:lines in the comment window.  a:conv, when non-empty, is a per-line
@@ -799,6 +831,8 @@ function! git_tree_diff#pr#comments_select() abort
   let l:origin = win_getid()
   call s:ShowComment(l:idx)
   call s:JumpToCode(t:gtd_pr.comments[l:idx])
+  " re-apply after a possible file switch in the code window
+  call s:HighlightCommentLine(t:gtd_pr.comments[l:idx])
   call win_gotoid(l:origin)
 endfunction
 

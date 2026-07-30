@@ -198,6 +198,12 @@ In the file window, <Leader>fc (or |:FGitPrOpenComment|) on a line with a
 "C" sign opens the comment thread of that line in a markdown window at the
 far right.  In the comment window "q" closes it and "r" starts a reply.
 
+For review comments the first line of the comment window states whether
+the conversation is resolved or unresolved.  While the comment is shown,
+the commented line is highlighted in the code window if that window
+currently shows the commented file; the highlight style is configured with
+|g:git_tree_diff_pr_highlight_style|.
+
                                                      *git-tree-diff-pr-comments*
 |:FGitPrCommentsOpen| lists all comments of the pull request in a window at
 the bottom: first the conversation comments, then the review comments
@@ -245,6 +251,13 @@ g:git_tree_diff_pr_comments_height
                                                        *g:git_tree_diff_gh_cmd*
 g:git_tree_diff_gh_cmd
     The 'gh' executable used for all GitHub access.  Default: "gh"
+
+                                          *g:git_tree_diff_pr_highlight_style*
+g:git_tree_diff_pr_highlight_style
+    Style of the highlight applied to the commented code line while its
+    comment is shown: "underline", "italic" or "background".  Evaluated
+    when the plugin is loaded.  The highlight group GitTreeDiffPrCommentLine
+    can also be redefined directly.  Default: "underline"
 
                                                       *g:git_tree_diff_browser*
 g:git_tree_diff_browser
