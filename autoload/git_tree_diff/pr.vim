@@ -112,10 +112,10 @@ function! s:OpenPr(root, number) abort
   endif
   let l:nwo = get(l:repo, 'nameWithOwner', '')
 
-  let [l:err, l:view] = s:GhJson(a:root, 'pr view ' . a:number
-        \ . ' --json title,headRefOid,baseRefOid')
+  let [l:err, l:view] = s:GhJson(a:root,
+        \ 'api ' . shellescape('repos/' . l:nwo . '/pulls/' . a:number))
   if l:err
-    return s:Error('gh pr view failed: ' . l:view)
+    return s:Error('fetching the pull request failed: ' . l:view)
   endif
 
   let [l:err, l:diff] = s:Gh(a:root, 'pr diff ' . a:number)
@@ -135,8 +135,8 @@ function! s:OpenPr(root, number) abort
         \ 'nwo': l:nwo,
         \ 'number': a:number,
         \ 'title': get(l:view, 'title', ''),
-        \ 'head': get(l:view, 'headRefOid', ''),
-        \ 'base': get(l:view, 'baseRefOid', ''),
+        \ 'head': get(get(l:view, 'head', {}), 'sha', ''),
+        \ 'base': get(get(l:view, 'base', {}), 'sha', ''),
         \ 'files': l:files,
         \ 'changes': l:changes,
         \ 'comments': l:comments,
