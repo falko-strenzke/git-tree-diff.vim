@@ -136,6 +136,7 @@ function! s:OpenPr(root, number) abort
         \ 'number': a:number,
         \ 'title': get(l:view, 'title', ''),
         \ 'head': get(get(l:view, 'head', {}), 'sha', ''),
+        \ 'head_ref': get(get(l:view, 'head', {}), 'ref', ''),
         \ 'base': get(get(l:view, 'base', {}), 'sha', ''),
         \ 'files': l:files,
         \ 'changes': l:changes,
@@ -332,12 +333,9 @@ function! s:OpenFile(path) abort
   " a deleted file only exists on the base side
   let l:ref = l:info.deleted ? t:gtd_pr.base : t:gtd_pr.head
 
-  " if the PR head is checked out, edit the real file so it can be modified
+  " if the PR is checked out, edit the real file so it can be modified
   let l:full = t:gtd_pr.root . '/' . a:path
-  let [l:err, l:head] = git_tree_diff#git(t:gtd_pr.root, 'rev-parse HEAD')
-  if !l:info.deleted && !l:err && !empty(l:head)
-        \ && l:head[0] ==# t:gtd_pr.head
-        \ && filereadable(l:full)
+  if !l:info.deleted && s:PrCheckedOut() && filereadable(l:full)
     " do not reload the file if it is already shown (it may have unsaved
     " local changes)
     if expand('%:p') !=# fnamemodify(l:full, ':p')
@@ -366,6 +364,20 @@ function! s:OpenFile(path) abort
   let b:gtd_pr_path = a:path
   nnoremap <buffer> <silent> <leader>fc :FGitPrOpenComment<CR>
   call s:PlaceSigns(bufnr('%'), a:path)
+endfunction
+
+" The PR counts as checked out if HEAD is the PR head commit or the current
+" branch is the PR head branch (the local branch may contain additional
+" commits on top of the published PR head).
+function! s:PrCheckedOut() abort
+  let [l:err, l:head] = git_tree_diff#git(t:gtd_pr.root, 'rev-parse HEAD')
+  if !l:err && !empty(l:head) && l:head[0] ==# t:gtd_pr.head
+    return 1
+  endif
+  let [l:err, l:branch] = git_tree_diff#git(t:gtd_pr.root,
+        \ 'branch --show-current')
+  return !l:err && !empty(l:branch) && !empty(t:gtd_pr.head_ref)
+        \ && l:branch[0] ==# t:gtd_pr.head_ref
 endfunction
 
 function! s:FileContent(ref, path) abort
@@ -643,6 +655,43 @@ function! s:MarkTreeFile(path) abort
       return
     endif
   endfor
+endfunction
+
+" ---------------------------------------------------------------------------
+" branch checkout (:FGitPrCheckoutBranch)
+" ---------------------------------------------------------------------------
+
+function! git_tree_diff#pr#checkout() abort
+  if exists('t:gtd_pr')
+    let l:root = t:gtd_pr.root
+    let l:number = t:gtd_pr.number
+  elseif exists('b:gtd_pr_prs')
+    let l:pr = get(b:gtd_pr_prs, line('.') - 1, {})
+    if empty(l:pr)
+      return
+    endif
+    let l:root = b:gtd_pr_root
+    let l:number = l:pr.number
+  else
+    return s:Error('no pull request selected (use :FGitPrList)')
+  endif
+
+  let [l:err, l:out] = s:Gh(l:root, 'pr checkout ' . l:number . ' 2>&1')
+  if l:err
+    return s:Error('checkout of PR #' . l:number . ' failed: '
+          \ . join(l:out, ' '))
+  endif
+  echomsg 'git-tree-diff: checked out the branch of PR #' . l:number
+
+  " reload the shown file so the working tree copy is edited from now on
+  if exists('t:gtd_pr') && win_id2win(t:gtd_pr.file_win)
+    let l:path = getbufvar(winbufnr(t:gtd_pr.file_win), 'gtd_pr_path', '')
+    if !empty(l:path)
+      let l:cur = win_getid()
+      call s:OpenFile(l:path)
+      call win_gotoid(l:cur)
+    endif
+  endif
 endfunction
 
 " ---------------------------------------------------------------------------

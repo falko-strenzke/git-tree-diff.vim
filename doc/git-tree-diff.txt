@@ -90,6 +90,15 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     Add a new comment to the pull request conversation.  The comment is
     written in a new markdown buffer; |:write| sends it to GitHub.
 
+                                                        *:FGitPrCheckoutBranch*
+:FGitPrCheckoutBranch
+    Check out the branch of the selected pull request (the pull request of
+    the current tab, or the one under the cursor in the pull request list)
+    using 'gh pr checkout'.  Fails with an error message if the local
+    state does not permit the checkout (e.g. conflicting uncommitted
+    changes).  Afterwards the file window is reloaded so the working tree
+    copy is edited, see |git-tree-diff-pr|.
+
 ==============================================================================
 3. TREE WINDOW                                              *git-tree-diff-tree*
 
@@ -136,11 +145,13 @@ gutter signs:
     ▁ (GitTreeDiffPrDel)      lines were deleted above this line
     C (GitTreeDiffPrComment)  the line has review comments
 
-If the pull request head is the commit checked out in the working tree,
-the real file is edited - even when it has local unstaged or uncommitted
-changes - so it can be modified and saved; otherwise a read-only buffer
-named gtd-pr://{rev}/{path} is shown.  A file deleted by the pull request
-is shown in its base version.
+If the pull request is checked out in the working tree - HEAD is the pull
+request head commit, or the current branch is the pull request branch
+(possibly with additional local commits on top) - the real file is edited,
+even when it has local unstaged or uncommitted changes, so it can be
+modified and saved.  |:FGitPrCheckoutBranch| checks the branch out for
+you.  Otherwise a read-only buffer named gtd-pr://{rev}/{path} is shown.
+A file deleted by the pull request is shown in its base version.
 
 For a checked-out file, local modifications relative to the pull request
 head version are additionally marked in red in the gutter (red ┃ for

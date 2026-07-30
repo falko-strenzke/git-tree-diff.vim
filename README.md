@@ -45,10 +45,12 @@ files on the left — like GitHub's "Files changed" view — and a file window
 on the right. Opening a file from the tree shows the pull request version
 of the file with gutter signs: `┃` for added/changed lines, `▁` where lines
 were deleted, and `C` on lines that have review comments. If the pull
-request head is the commit checked out in the working tree, the real file
-is edited — even with local unstaged or uncommitted changes — so it can be
-modified and saved; local modifications relative to the PR head version
-are marked in red in the gutter and recomputed on every save.
+request is checked out (HEAD is the PR head commit, or the current branch
+is the PR branch — possibly with additional local commits on top), the
+real file is edited — even with local unstaged or uncommitted changes — so
+it can be modified and saved; local modifications relative to the PR head
+version are marked in red in the gutter and recomputed on every save.
+`:FGitPrCheckoutBranch` checks the branch out for you.
 
 | Command                 | Action                                            |
 |-------------------------|---------------------------------------------------|
@@ -57,6 +59,7 @@ are marked in red in the gutter and recomputed on every save.
 | `:FGitPrCommentsOpen`   | List all PR comments (also `Close` and `Toggle`)  |
 | `:FGitPrReply`          | Reply to the selected comment                     |
 | `:FGitPrNewComment`     | Add a new comment to the PR conversation          |
+| `:FGitPrCheckoutBranch` | Check out the branch of the selected PR           |
 
 Comments are displayed as markdown in a window at the far right (`q`
 closes it, `r` starts a reply). The comment list shows every comment with
