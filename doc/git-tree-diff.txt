@@ -10,7 +10,8 @@ CONTENTS                                                *git-tree-diff-contents*
     2. Commands ..................... |git-tree-diff-commands|
     3. Tree window .................. |git-tree-diff-tree|
     4. Log window ................... |git-tree-diff-log|
-    5. Configuration ................ |git-tree-diff-configuration|
+    5. Pull requests ................ |git-tree-diff-pr|
+    6. Configuration ................ |git-tree-diff-configuration|
 
 ==============================================================================
 1. INTRODUCTION                                     *git-tree-diff-introduction*
@@ -55,6 +56,40 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     against its first parent; a root commit is compared against the empty
     tree.  Selecting another commit reuses the same windows.
 
+                                                                  *:FGitPrList*
+:FGitPrList
+    Show a list of the open GitHub pull requests of the current repository
+    in a window at the bottom.  Requires the 'gh' command line tool to be
+    installed and authenticated.  Pressing <CR> on a pull request opens it
+    in a new tab page, see |git-tree-diff-pr|.
+
+                                                           *:FGitPrOpenComment*
+:FGitPrOpenComment
+    In a pull request file window: open the comment thread on the current
+    line in the comment window at the far right.  Also mapped to
+    <Leader>fc there.  In the comment list: same as <CR>.
+
+                                                          *:FGitPrCommentsOpen*
+                                                         *:FGitPrCommentsClose*
+                                                        *:FGitPrCommentsToggle*
+:FGitPrCommentsOpen
+:FGitPrCommentsClose
+:FGitPrCommentsToggle
+    Open, close or toggle the list of all comments of the pull request in a
+    window at the bottom, see |git-tree-diff-pr-comments|.
+
+                                                                 *:FGitPrReply*
+:FGitPrReply
+    Reply to the selected comment: in the comment list the comment under
+    the cursor, otherwise the comment last opened in the comment window.
+    The reply is written in a new markdown buffer; |:write| sends it to
+    GitHub.  Also mapped to "r" in the comment window.
+
+                                                            *:FGitPrNewComment*
+:FGitPrNewComment
+    Add a new comment to the pull request conversation.  The comment is
+    written in a new markdown buffer; |:write| sends it to GitHub.
+
 ==============================================================================
 3. TREE WINDOW                                              *git-tree-diff-tree*
 
@@ -86,7 +121,51 @@ Mappings in the log window:
     q               Close the tab page.
 
 ==============================================================================
-5. CONFIGURATION                                   *git-tree-diff-configuration*
+5. PULL REQUESTS                                              *git-tree-diff-pr*
+
+All GitHub access goes through the 'gh' command line tool, which must be
+installed and authenticated (see 'gh auth login').
+
+|:FGitPrList| shows the open pull requests.  Opening one creates a new tab
+page with a foldable tree of the changed files on the left - like the
+GitHub "Files changed" view - and a file window on the right.  Opening a
+file from the tree shows the pull request version of the file with these
+gutter signs:
+
+    ┃ (GitTreeDiffPrAdd)      line added or changed by the pull request
+    ▁ (GitTreeDiffPrDel)      lines were deleted above this line
+    C (GitTreeDiffPrComment)  the line has review comments
+
+If the pull request branch is checked out in the working tree, the real
+file is edited so it can be modified and saved; otherwise a read-only
+buffer named gtd-pr://{rev}/{path} is shown.  A file deleted by the pull
+request is shown in its base version.
+
+In the file window, <Leader>fc (or |:FGitPrOpenComment|) on a line with a
+"C" sign opens the comment thread of that line in a markdown window at the
+far right.  In the comment window "q" closes it and "r" starts a reply.
+
+                                                     *git-tree-diff-pr-comments*
+|:FGitPrCommentsOpen| lists all comments of the pull request in a window at
+the bottom: first the conversation comments, then the review comments
+grouped by file and line.  Each comment is shown with a header (author,
+time, location; replies are marked with "↳") and a preview line.
+
+Mappings in the pull request list and in the comment list:
+
+    <CR>            Open the pull request / show the comment.
+    o               Same as <CR>.
+    <2-LeftMouse>   Same as <CR>.
+    <C-n> / <C-p>   Comment list only: jump to the next/previous comment.
+    q               Close the window.
+
+Replies (|:FGitPrReply|) and new conversation comments (|:FGitPrNewComment|)
+are written in a scratch markdown buffer; |:write| sends the comment to
+GitHub and closes the buffer.  The first line ("<!-- ... -->") is an
+instruction and is stripped before sending.
+
+==============================================================================
+6. CONFIGURATION                                   *git-tree-diff-configuration*
 
                                                         *g:git_tree_diff_width*
 g:git_tree_diff_width
@@ -96,5 +175,17 @@ g:git_tree_diff_width
 g:git_tree_diff_log_width
     Width of the log window in columns once the tree and diff windows are
     shown.  Default: 50
+
+                                             *g:git_tree_diff_pr_comment_width*
+g:git_tree_diff_pr_comment_width
+    Width of the pull request comment window in columns.  Default: 50
+
+                                           *g:git_tree_diff_pr_comments_height*
+g:git_tree_diff_pr_comments_height
+    Height of the pull request comment list window in lines.  Default: 12
+
+                                                       *g:git_tree_diff_gh_cmd*
+g:git_tree_diff_gh_cmd
+    The 'gh' executable used for all GitHub access.  Default: "gh"
 
  vim:tw=78:ts=8:ft=help:norl:

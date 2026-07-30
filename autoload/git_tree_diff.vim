@@ -16,6 +16,26 @@ function! s:Git(root, args) abort
   return [v:shell_error, l:out]
 endfunction
 
+" Public wrappers for use by other modules of the plugin (autoload/git_tree_diff/).
+function! git_tree_diff#git(root, args) abort
+  return s:Git(a:root, a:args)
+endfunction
+
+function! git_tree_diff#find_root() abort
+  return s:FindRoot()
+endfunction
+
+function! git_tree_diff#tree_lines(files, header) abort
+  let l:lines = copy(a:header)
+  let l:map = map(copy(a:header), '{}')
+  call s:RenderTree(s:BuildTree(a:files), 0, '', l:lines, l:map)
+  return [l:lines, l:map]
+endfunction
+
+function! git_tree_diff#mark_selected(lnum) abort
+  call s:MarkSelected(a:lnum)
+endfunction
+
 function! s:FindRoot() abort
   let l:dir = expand('%:p:h')
   if empty(l:dir) || !isdirectory(l:dir)
@@ -212,10 +232,9 @@ function! s:SetupTreeBuffer(files) abort
   setlocal foldtext=git_tree_diff#foldtext()
   silent! execute 'setlocal fillchars+=fold:\ '
 
-  let l:lines = [fnamemodify(t:gtd.root, ':t'),
-        \ t:gtd.left_label . ' → ' . t:gtd.right_label, '']
-  let l:map = [{}, {}, {}]
-  call s:RenderTree(s:BuildTree(a:files), 0, '', l:lines, l:map)
+  let [l:lines, l:map] = git_tree_diff#tree_lines(a:files,
+        \ [fnamemodify(t:gtd.root, ':t'),
+        \ t:gtd.left_label . ' → ' . t:gtd.right_label, ''])
   let b:gtd_map = l:map
   call setline(1, l:lines)
   setlocal nomodifiable
