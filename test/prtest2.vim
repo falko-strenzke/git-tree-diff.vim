@@ -113,6 +113,35 @@ try
   let s:tabs = tabpagenr('$')
   FGitPrOfCurrentBranch
   call Check('branch no pr', tabpagenr('$') == s:tabs)
+
+  " --- applying suggested changes -------------------------------------------
+  " single-line suggestion (@dave, frob.h line 2), applied from the thread
+  FGitPrCommentsOpen
+  call cursor(3, 1)
+  call git_tree_diff#pr#comments_select()
+  call win_gotoid(t:gtd_pr.comment_win)
+  call cursor(1, 1)
+  call search('^```suggestion$')
+  FGitPrApplySuggestion
+  let s:fbuf = winbufnr(win_id2win(t:gtd_pr.file_win))
+  call Check('suggestion applied', bufname(s:fbuf) =~# 'frob\.h'
+        \ && getbufline(s:fbuf, 2, 2) ==# ['#define FROB_H /* include guard */']
+        \ && getbufvar(s:fbuf, '&modified'))
+  call win_execute(t:gtd_pr.file_win, 'let g:sline = line(".")')
+  call Check('suggestion cursor', g:sline == 2)
+  call win_execute(t:gtd_pr.file_win, 'silent write')
+  " multi-line suggestion (@bob, main.c lines 4-5 via start_line)
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(7, 1)
+  call git_tree_diff#pr#comments_select()
+  call win_gotoid(t:gtd_pr.comment_win)
+  call cursor(1, 1)
+  call search('^```suggestion$')
+  FGitPrApplySuggestion
+  let s:fbuf = winbufnr(win_id2win(t:gtd_pr.file_win))
+  call Check('multiline suggestion applied', bufname(s:fbuf) =~# 'main\.c'
+        \ && getbufline(s:fbuf, 4, 6) ==# ['int main(void) {  /* entry */',
+        \ '  return frob() + 1;', '}'])
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry

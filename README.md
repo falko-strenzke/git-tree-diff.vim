@@ -66,6 +66,7 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrNewComment`     | Add a new comment to the PR conversation          |
 | `:FGitPrCheckoutBranch` | Check out the branch of the selected PR           |
 | `:FGitPrOpenConversation` | Show the full conversation in the comment window |
+| `:FGitPrApplySuggestion`| Apply the suggested change under the cursor (`a`)  |
 | `:FGitPrBrowseComment`  | Open the selected comment on GitHub               |
 | `:FGitPrCommentCopyLink`| Copy the selected comment's GitHub link           |
 | `:FGitPrResolve`        | Resolve the selected review conversation          |
@@ -73,7 +74,9 @@ version are marked in red in the gutter and recomputed on every save.
 | `:FGitPrCommentAutoOpenOn` / `...Off` | Auto-open the conversation under the cursor |
 
 Comments are displayed as markdown in a window at the far right (`q`
-closes it, `r` starts a reply); for review comments the first line states
+closes it, `r` starts a reply, `a` applies the GitHub suggested change
+under the cursor to the checked-out file — leaving the buffer unsaved for
+review); for review comments the first line states
 whether the conversation is resolved, and the commented code line is
 highlighted while the comment is shown (style configurable via
 `g:git_tree_diff_pr_highlight_style`). The comment list shows every comment with

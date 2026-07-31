@@ -105,6 +105,16 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     file location in the header.  The link commands below, "r" and
     |:FGitPrReply| act on the comment under the cursor.
 
+                                                       *:FGitPrApplySuggestion*
+:FGitPrApplySuggestion
+    Apply the GitHub suggested change ("```suggestion" block) under the
+    cursor in the comment window or in the conversation view to the local
+    file: the commented line range is replaced with the suggested lines.
+    Requires the pull request branch to be checked out (see
+    |:FGitPrCheckoutBranch|).  The file buffer is modified but not saved,
+    so the result can be reviewed first.  Also mapped to "a" in the
+    comment window.
+
                                                           *:FGitPrBrowseComment*
 :FGitPrBrowseComment
     Open the GitHub page of the selected comment (the comment under the
@@ -215,7 +225,15 @@ file is saved.
 
 In the file window, <Leader>fc (or |:FGitPrOpenComment|) on a line with a
 "C" sign opens the comment thread of that line in a markdown window at the
-far right.  In the comment window "q" closes it and "r" starts a reply.
+far right.  In the comment window "q" closes it, "r" starts a reply and
+"a" applies the suggested change under the cursor
+(|:FGitPrApplySuggestion|).
+
+GitHub suggested changes are shown as "```suggestion" markdown blocks in
+the comment and conversation windows.  With the pull request branch
+checked out, |:FGitPrApplySuggestion| (or "a") on such a block replaces
+the commented line range of the local file with the suggested lines; the
+buffer is left modified for review.
 
 For review comments the first line of the comment window states whether
 the conversation is resolved or unresolved.  While the comment is shown,

@@ -376,6 +376,25 @@ try
   call Check('refresh: conversation updated',
         \ bufname(s:CBuf()) =~# 'gtd-pr://conversation$'
         \ && !empty(filter(getbufline(s:CBuf(), 1, '$'), 'v:val =~# "@frank"')))
+
+  " --- 9. suggested changes -------------------------------------------------
+  " suggestions are rendered in the comment window as markdown blocks
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(3, 1)
+  call git_tree_diff#pr#comments_select()
+  call Check('suggestion shown', !empty(filter(getbufline(s:CBuf(), 1, '$'),
+        \ 'v:val =~# "^```suggestion$"')))
+  " applying needs the checked out working tree copy
+  call win_gotoid(t:gtd_pr.comment_win)
+  call cursor(1, 1)
+  call search('^```suggestion$')
+  FGitPrApplySuggestion
+  call Check('apply needs checkout',
+        \ execute('messages') =~# 'branch is not checked out')
+  call cursor(1, 1)
+  FGitPrApplySuggestion
+  call Check('apply not on suggestion',
+        \ execute('messages') =~# 'not on a suggested change')
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry

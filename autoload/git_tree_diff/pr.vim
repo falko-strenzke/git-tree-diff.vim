@@ -267,6 +267,7 @@ function! s:FetchComments(root, nwo, number) abort
     endif
     for l:c in l:list
       let l:line = s:Num(l:c, 'line')
+      let l:start = s:Num(l:c, 'start_line')
       let l:path = get(l:c, 'path', '')
       let l:url = get(l:c, 'html_url', '')
       call add(l:comments, {
@@ -274,6 +275,8 @@ function! s:FetchComments(root, nwo, number) abort
             \ 'id': l:c.id,
             \ 'path': type(l:path) == v:t_string ? l:path : '',
             \ 'line': l:line > 0 ? l:line : s:Num(l:c, 'original_line'),
+            \ 'start_line': l:start > 0 ? l:start
+            \   : s:Num(l:c, 'original_start_line'),
             \ 'reply_to': s:Num(l:c, 'in_reply_to_id'),
             \ 'user': get(get(l:c, 'user', {}), 'login', '?'),
             \ 'time': s:FmtTime(get(l:c, 'created_at', '')),
@@ -697,13 +700,51 @@ function! s:ShowComment(idx) abort
     let l:title .= ' · ' . (get(l:c, 'resolved', 0) ? 'resolved' : 'unresolved')
   endif
   let l:lines = [l:title]
+  let l:sugg = [{}]
   for l:m in l:thread
     call extend(l:lines, ['', '## @' . l:m.user . ' · ' . l:m.time, ''])
-    call extend(l:lines, split(l:m.body, '\r\?\n', 1))
+    call extend(l:sugg, [{}, {}, {}])
+    let l:body = split(l:m.body, '\r\?\n', 1)
+    call extend(l:lines, l:body)
+    call extend(l:sugg, s:SuggestionMap(l:m, l:body))
   endfor
 
-  call s:FillCommentWin(l:lines, 'gtd-pr://comment/' . l:root_id, [])
+  call s:FillCommentWin(l:lines, 'gtd-pr://comment/' . l:root_id, [], l:sugg)
   call s:HighlightCommentLine(l:c)
+endfunction
+
+" Map each body line of comment a:c to the suggested change
+" ("```suggestion" fenced block) it belongs to, or {} for other lines.  A
+" suggestion replaces the commented line range start_line..line (both are
+" line numbers of the pull request head version).
+function! s:SuggestionMap(c, body) abort
+  let l:map = repeat([{}], len(a:body))
+  if a:c.kind !=# 'review' || a:c.line <= 0
+    return l:map
+  endif
+  let l:i = 0
+  while l:i < len(a:body)
+    if a:body[l:i] =~# '^\s*```suggestion\s*$'
+      let l:j = l:i + 1
+      let l:text = []
+      while l:j < len(a:body) && a:body[l:j] !~# '^\s*```\s*$'
+        call add(l:text, a:body[l:j])
+        let l:j += 1
+      endwhile
+      if l:j < len(a:body)
+        let l:s = {'path': a:c.path,
+              \ 'start': get(a:c, 'start_line', 0) > 0
+              \   ? a:c.start_line : a:c.line,
+              \ 'end': a:c.line, 'text': l:text}
+        for l:k in range(l:i, l:j)
+          let l:map[l:k] = l:s
+        endfor
+        let l:i = l:j
+      endif
+    endif
+    let l:i += 1
+  endwhile
+  return l:map
 endfunction
 
 " While a comment is shown, highlight the commented line in the code window
@@ -730,8 +771,9 @@ endfunction
 
 " Show a:lines in the comment window.  a:conv, when non-empty, is a per-line
 " list mapping each buffer line to the comment it belongs to (used by the
-" conversation view to resolve "the comment under the cursor").
-function! s:FillCommentWin(lines, name, conv) abort
+" conversation view to resolve "the comment under the cursor").  a:sugg is
+" the per-line suggested-change map built by s:SuggestionMap().
+function! s:FillCommentWin(lines, name, conv, sugg) abort
   call s:EnsureCommentWin()
   let l:cur = win_getid()
   call win_gotoid(t:gtd_pr.comment_win)
@@ -743,11 +785,13 @@ function! s:FillCommentWin(lines, name, conv) abort
   if !empty(a:conv)
     let b:gtd_pr_conv = a:conv
   endif
+  let b:gtd_pr_sugg = a:sugg
   execute 'silent! file ' . fnameescape(a:name)
   setlocal filetype=markdown
   setlocal nomodifiable
   nnoremap <buffer> <silent> q :close<CR>
   nnoremap <buffer> <silent> r :FGitPrReply<CR>
+  nnoremap <buffer> <silent> a :FGitPrApplySuggestion<CR>
   call win_gotoid(l:cur)
 endfunction
 
@@ -765,15 +809,17 @@ function! s:RenderConversation() abort
   let l:conv = sort(copy(t:gtd_pr.comments), function('s:CompareTime'))
   let l:lines = ['# PR #' . t:gtd_pr.number . ' · conversation']
   let l:map = [{}]
+  let l:sugg = [{}]
   for l:c in l:conv
     let l:where = l:c.kind ==# 'review' && !empty(l:c.path)
           \ ? ' · ' . l:c.path . (l:c.line > 0 ? ':' . l:c.line : '') : ''
-    let l:block = ['', '## @' . l:c.user . ' · ' . l:c.time . l:where, '']
-    call extend(l:block, split(l:c.body, '\r\?\n', 1))
-    call extend(l:lines, l:block)
-    call extend(l:map, map(l:block, 'l:c'))
+    let l:head = ['', '## @' . l:c.user . ' · ' . l:c.time . l:where, '']
+    let l:body = split(l:c.body, '\r\?\n', 1)
+    call extend(l:lines, l:head + l:body)
+    call extend(l:map, repeat([l:c], len(l:head) + len(l:body)))
+    call extend(l:sugg, repeat([{}], len(l:head)) + s:SuggestionMap(l:c, l:body))
   endfor
-  call s:FillCommentWin(l:lines, 'gtd-pr://conversation', l:map)
+  call s:FillCommentWin(l:lines, 'gtd-pr://conversation', l:map, l:sugg)
 endfunction
 
 function! s:CompareTime(a, b) abort
@@ -781,6 +827,49 @@ function! s:CompareTime(a, b) abort
     return a:a.time <# a:b.time ? -1 : 1
   endif
   return a:a.id == a:b.id ? 0 : a:a.id < a:b.id ? -1 : 1
+endfunction
+
+" Apply the suggested change under the cursor in the comment or conversation
+" window to the checked-out working tree copy (:FGitPrApplySuggestion, "a").
+" The buffer is modified but not saved.
+function! git_tree_diff#pr#apply_suggestion() abort
+  if !exists('t:gtd_pr')
+    return s:Error('no pull request open in this tab (use :FGitPrList)')
+  endif
+  if !exists('b:gtd_pr_sugg')
+    return s:Error('not in a comment window (open a comment first)')
+  endif
+  let l:s = get(b:gtd_pr_sugg, line('.') - 1, {})
+  if empty(l:s)
+    return s:Error('the cursor is not on a suggested change')
+  endif
+  " suggestions can only be applied to the real, editable file
+  if !s:PrCheckedOut() || !filereadable(t:gtd_pr.root . '/' . l:s.path)
+    return s:Error('the pull request branch is not checked out'
+          \ . ' (use :FGitPrCheckoutBranch)')
+  endif
+  let l:origin = win_getid()
+  call s:OpenFile(l:s.path)
+  call s:MarkTreeFile(l:s.path)
+  call win_gotoid(l:origin)
+  let l:buf = winbufnr(t:gtd_pr.file_win)
+  if getbufvar(l:buf, 'gtd_pr_path', '') !=# l:s.path
+    return s:Error('could not open ' . l:s.path . ' in the file window')
+  endif
+  if l:s.end > get(get(getbufinfo(l:buf), 0, {}), 'linecount', 0)
+    return s:Error('the suggested range ' . l:s.start . '-' . l:s.end
+          \ . ' does not exist in the local file')
+  endif
+  call deletebufline(l:buf, l:s.start, l:s.end)
+  if !empty(l:s.text)
+    call appendbufline(l:buf, l:s.start - 1, l:s.text)
+  endif
+  call win_execute(t:gtd_pr.file_win, [
+        \ printf('call cursor(min([%d, line(''$'')]), 1)', l:s.start),
+        \ 'silent! normal! zv',
+        \ 'normal! zz'])
+  echomsg printf('git-tree-diff: applied the suggestion to %s:%d (not saved)',
+        \ l:s.path, l:s.start)
 endfunction
 
 " ---------------------------------------------------------------------------
