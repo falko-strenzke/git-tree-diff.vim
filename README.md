@@ -39,7 +39,9 @@ commit reuses the same windows.
 Requires the [gh](https://cli.github.com/) command line tool (installed and
 authenticated).
 
-`:FGitPrList` lists the open GitHub pull requests of the repository.
+`:FGitPrList` lists the open GitHub pull requests of the repository;
+`:FGitPrOfCurrentBranch` directly opens the pull request belonging to the
+currently checked-out branch (or a filtered list if there are several).
 Opening one (`<CR>`) creates a new tab with a foldable tree of the changed
 files on the left — like GitHub's "Files changed" view, with a `C` gutter
 mark on files that have unresolved review comments — and a file window on
@@ -57,6 +59,7 @@ version are marked in red in the gutter and recomputed on every save.
 | Command                 | Action                                            |
 |-------------------------|---------------------------------------------------|
 | `:FGitPrList`           | List open pull requests                           |
+| `:FGitPrOfCurrentBranch`| Open the PR of the checked-out branch             |
 | `:FGitPrOpenComment`    | Open the comment on the current line (`<leader>fc`) |
 | `:FGitPrCommentsOpen`   | List all PR comments (also `Close` and `Toggle`)  |
 | `:FGitPrReply`          | Reply to the selected comment                     |
@@ -78,7 +81,9 @@ an author/time header and a preview line; `<CR>` opens the comment,
 `<C-n>`/`<C-p>` jump between comments. Opening a review comment from the
 list also jumps the file window to the commented line — switching the file
 and opening folds as needed. Replies and new comments are
-written in a markdown buffer and sent to GitHub with `:w`.
+written in a markdown buffer and sent to GitHub with `:w`; after posting —
+and after resolving/unresolving — the gutter signs, the comment list and an
+open comment or conversation window update immediately.
 
 ## Tree window mappings
 
@@ -115,6 +120,13 @@ Or with any plugin manager, e.g. vim-plug:
 ```vim
 Plug 'fstrenzke/git-tree-diff.vim'
 ```
+
+## Tests
+
+`test/run.sh` runs the headless test suite for the pull request features.
+It needs `vim` and `git`; all GitHub access is served by a local `gh` stub,
+so no network access or authentication is required. All mutable state goes
+to a temporary directory — the repository stays clean.
 
 ## Configuration
 

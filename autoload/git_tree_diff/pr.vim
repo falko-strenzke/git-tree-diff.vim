@@ -66,15 +66,47 @@ function! git_tree_diff#pr#list() abort
     echomsg 'git-tree-diff: no open pull requests'
     return
   endif
+  call s:PrListWindow(l:root, l:prs)
+endfunction
 
+" Open the pull request of the currently checked out branch
+" (:FGitPrOfCurrentBranch).  With several matching pull requests (e.g.
+" against different base branches) a filtered pull request list is shown.
+function! git_tree_diff#pr#of_current_branch() abort
+  let l:root = git_tree_diff#find_root()
+  if empty(l:root)
+    return s:Error('not inside a git repository')
+  endif
+  let [l:err, l:branch] = git_tree_diff#git(l:root, 'branch --show-current')
+  if l:err || empty(l:branch) || empty(l:branch[0])
+    return s:Error('no branch checked out')
+  endif
+  let [l:err, l:prs] = s:GhJson(l:root, 'pr list --head '
+        \ . shellescape(l:branch[0]) . ' --limit 200'
+        \ . ' --json number,title,author,headRefName,updatedAt')
+  if l:err
+    return s:Error('gh pr list failed: ' . l:prs)
+  endif
+  if empty(l:prs)
+    echomsg 'git-tree-diff: no open pull request for branch ' . l:branch[0]
+    return
+  endif
+  if len(l:prs) == 1
+    call s:OpenPr(l:root, l:prs[0].number)
+  else
+    call s:PrListWindow(l:root, l:prs)
+  endif
+endfunction
+
+function! s:PrListWindow(root, prs) abort
   botright new
-  execute 'resize ' . min([len(l:prs) + 1, 15])
+  execute 'resize ' . min([len(a:prs) + 1, 15])
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   setlocal nonumber norelativenumber nowrap nolist nospell
   setlocal cursorline signcolumn=no winfixheight
-  let b:gtd_pr_root = l:root
-  let b:gtd_pr_prs = l:prs
-  call setline(1, map(copy(l:prs), 's:FormatPrLine(v:val)'))
+  let b:gtd_pr_root = a:root
+  let b:gtd_pr_prs = a:prs
+  call setline(1, map(copy(a:prs), 's:FormatPrLine(v:val)'))
   setlocal nomodifiable
   silent! file gtd-pr://list
   setlocal filetype=gittreediffprlist
@@ -725,6 +757,11 @@ function! git_tree_diff#pr#open_conversation() abort
   if !exists('t:gtd_pr')
     return s:Error('no pull request open in this tab (use :FGitPrList)')
   endif
+  call s:RenderConversation()
+  call win_gotoid(t:gtd_pr.comment_win)
+endfunction
+
+function! s:RenderConversation() abort
   let l:conv = sort(copy(t:gtd_pr.comments), function('s:CompareTime'))
   let l:lines = ['# PR #' . t:gtd_pr.number . ' · conversation']
   let l:map = [{}]
@@ -737,7 +774,6 @@ function! git_tree_diff#pr#open_conversation() abort
     call extend(l:map, map(l:block, 'l:c'))
   endfor
   call s:FillCommentWin(l:lines, 'gtd-pr://conversation', l:map)
-  call win_gotoid(t:gtd_pr.comment_win)
 endfunction
 
 function! s:CompareTime(a, b) abort
@@ -1135,4 +1171,35 @@ function! s:RefreshComments() abort
     call s:SetupCommentsBuffer()
     call win_gotoid(l:cur)
   endif
+  call s:RefreshCommentWin()
+endfunction
+
+" Re-render the comment window so that new replies and a changed resolution
+" state become visible immediately.
+function! s:RefreshCommentWin() abort
+  if !win_id2win(t:gtd_pr.comment_win)
+    return
+  endif
+  let l:name = bufname(winbufnr(t:gtd_pr.comment_win))
+  call win_execute(t:gtd_pr.comment_win, 'let s:keep_lnum = line(".")')
+  if l:name =~# 'gtd-pr://conversation$'
+    call s:RenderConversation()
+  elseif l:name =~# 'gtd-pr://comment/' && !empty(t:gtd_pr.current)
+    let l:shown = -1
+    for l:i in range(len(t:gtd_pr.comments))
+      let l:c = t:gtd_pr.comments[l:i]
+      if l:c.kind ==# t:gtd_pr.current.kind && l:c.id == t:gtd_pr.current.id
+        let l:shown = l:i
+        break
+      endif
+    endfor
+    if l:shown < 0
+      return
+    endif
+    call s:ShowComment(l:shown)
+  else
+    return
+  endif
+  call win_execute(t:gtd_pr.comment_win,
+        \ 'call cursor(min([' . s:keep_lnum . ', line("$")]), 1)')
 endfunction

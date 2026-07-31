@@ -50,6 +50,7 @@ command! -nargs=? -complete=customlist,git_tree_diff#log_complete
 
 " GitHub pull requests (require the 'gh' command line tool).
 command! FGitPrList call git_tree_diff#pr#list()
+command! FGitPrOfCurrentBranch call git_tree_diff#pr#of_current_branch()
 command! FGitPrOpenComment call git_tree_diff#pr#open_comment()
 command! FGitPrCommentsOpen call git_tree_diff#pr#comments_open()
 command! FGitPrCommentsClose call git_tree_diff#pr#comments_close()

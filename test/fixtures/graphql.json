@@ -1,0 +1,4 @@
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+ {"id":"RT_kwDO101","isResolved":false,"comments":{"nodes":[{"databaseId":101}]}},
+ {"id":"RT_kwDO103","isResolved":true,"comments":{"nodes":[{"databaseId":103}]}}
+]}}}}}

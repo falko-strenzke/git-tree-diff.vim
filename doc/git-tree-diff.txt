@@ -63,6 +63,14 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     installed and authenticated.  Pressing <CR> on a pull request opens it
     in a new tab page, see |git-tree-diff-pr|.
 
+                                                       *:FGitPrOfCurrentBranch*
+:FGitPrOfCurrentBranch
+    Open the pull request whose head branch is the currently checked out
+    branch, exactly as if it had been selected in the |:FGitPrList| list.
+    If several open pull requests have this head branch (e.g. against
+    different base branches), a pull request list window showing only
+    those pull requests is opened instead.
+
                                                            *:FGitPrOpenComment*
 :FGitPrOpenComment
     In a pull request file window: open the comment thread on the current
@@ -120,7 +128,8 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     comment list or in the conversation view the comment under the cursor,
     in the comment window the conversation shown there.  Conversation
     comments of the pull request cannot be resolved.  Afterwards the
-    gutter signs and the comment list are refreshed.
+    gutter signs, the comment list and the comment window are refreshed,
+    so the new state is visible immediately.
 
                                                     *:FGitPrCommentAutoOpenOn*
                                                    *:FGitPrCommentAutoOpenOff*
@@ -236,7 +245,10 @@ Mappings in the pull request list and in the comment list:
 Replies (|:FGitPrReply|) and new conversation comments (|:FGitPrNewComment|)
 are written in a scratch markdown buffer; |:write| sends the comment to
 GitHub and closes the buffer.  The first line ("<!-- ... -->") is an
-instruction and is stripped before sending.
+instruction and is stripped before sending.  After a comment is posted -
+and likewise after |:FGitPrResolve| / |:FGitPrUnresolve| - the gutter
+signs, the comment list and an open comment or conversation window are
+updated immediately.
 
 ==============================================================================
 6. CONFIGURATION                                   *git-tree-diff-configuration*

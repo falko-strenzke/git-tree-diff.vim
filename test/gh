@@ -1,0 +1,45 @@
+#!/bin/bash
+# All mutable state (fixtures, logs) lives in the work dir set up by run.sh.
+DIR="${GTD_TEST_DIR:?GTD_TEST_DIR not set - run the tests via run.sh}"
+F="$DIR/fixtures"
+echo "$@" >> "$DIR/gh.log"
+case "$*" in
+  "repo view --json nameWithOwner")
+    echo '{"nameWithOwner":"octo/demo"}' ;;
+  "pr list --head "*)
+    cat "$F/prhead.json" ;;
+  "pr list "*)
+    cat "$F/prlist.json" ;;
+  "api repos/octo/demo/pulls/7")
+    if [[ "$PWD" == */repo2 ]]; then
+      HEAD_SHA=$(cat "$F/headsha2")
+    else
+      HEAD_SHA="aaaa111122223333444455556666777788889999"
+    fi
+    echo "{\"title\":\"Add frobnicator\",\"head\":{\"sha\":\"$HEAD_SHA\",\"ref\":\"feature/frob\"},\"base\":{\"sha\":\"bbbb111122223333444455556666777788889999\"}}" ;;
+  "pr checkout "*)
+    echo "Switched to branch" ;;
+  "api graphql -f query=mutation { resolveReviewThread"*)
+    echo '{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}' ;;
+  "api graphql -f query=mutation { unresolveReviewThread"*)
+    echo '{"data":{"unresolveReviewThread":{"thread":{"isResolved":false}}}}' ;;
+  "api graphql -f query="*)
+    cat "$F/graphql.json" ;;
+  "pr diff 7")
+    cat "$F/pr7.diff" ;;
+  "api repos/octo/demo/pulls/7/comments?per_page=100")
+    cat "$F/rev.json" ;;
+  "api repos/octo/demo/issues/7/comments?per_page=100")
+    cat "$F/iss.json" ;;
+  "api -H Accept: application/vnd.github.raw repos/octo/demo/contents/src/main.c?ref="*)
+    cat "$F/main.c" ;;
+  "api -H Accept: application/vnd.github.raw repos/octo/demo/contents/src/frob.h?ref="*)
+    cat "$F/frob.h" ;;
+  "api -H Accept: application/vnd.github.raw repos/octo/demo/contents/old.txt?ref="*)
+    cat "$F/old.txt" ;;
+  "api -X POST --input - "*)
+    { echo "URL: ${*: -1}"; echo -n "BODY: "; cat -; echo; } >> "$DIR/post.log"
+    echo '{"id": 999}' ;;
+  *)
+    echo "stub gh: unhandled: $*" >&2; exit 1 ;;
+esac

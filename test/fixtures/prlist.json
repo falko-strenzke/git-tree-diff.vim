@@ -1,0 +1,6 @@
+[
+ {"number": 7, "title": "Add frobnicator", "author": {"login": "alice"},
+  "headRefName": "feature/frob", "updatedAt": "2026-07-29T12:00:00Z"},
+ {"number": 9, "title": "Fix typos", "author": {"login": "bob"},
+  "headRefName": "typo-fixes", "updatedAt": "2026-07-25T08:30:00Z"}
+]

@@ -1,0 +1,29 @@
+diff --git a/src/main.c b/src/main.c
+index 1111111..2222222 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,5 +1,6 @@
+ #include <stdio.h>
++#include "frob.h"
+ 
+ int main(void) {
+-  return 0;
++  return frob();
+ }
+diff --git a/src/frob.h b/src/frob.h
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/src/frob.h
+@@ -0,0 +1,3 @@
++#ifndef FROB_H
++#define FROB_H
++#endif
+diff --git a/old.txt b/old.txt
+deleted file mode 100644
+index 4444444..0000000
+--- a/old.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-obsolete
+-content
