@@ -191,8 +191,9 @@ function! s:OpenPr(root, number) abort
 endfunction
 
 " Parse a unified diff into the ordered list of changed files and, per file,
-" the line numbers (in the new version) of added lines and of positions where
-" lines were deleted.
+" the line numbers (in the new version) classified as pure additions
+" ('add'), changed lines ('chg', a removal paired with an addition) and
+" positions where lines were deleted ('del').
 function! s:ParseDiff(lines) abort
   let l:files = []
   let l:changes = {}
@@ -201,27 +202,52 @@ function! s:ParseDiff(lines) abort
   let l:new = 0
   let l:old_rem = 0
   let l:new_rem = 0
+  " current run of consecutive -/+ lines: start line (new version) and the
+  " number of removed and added lines; git emits all '-' before all '+'
+  let l:bs = 0
+  let l:bm = 0
+  let l:bp = 0
   for l:line in a:lines
     if l:old_rem > 0 || l:new_rem > 0
       let l:ch = strpart(l:line, 0, 1)
       if l:ch ==# '+'
-        call add(l:changes[l:path].add, l:new)
+        if l:bm == 0 && l:bp == 0
+          let l:bs = l:new
+        endif
+        let l:bp += 1
         let l:new += 1
         let l:new_rem -= 1
       elseif l:ch ==# '-'
-        let l:lnum = max([l:new, 1])
-        if empty(l:changes[l:path].del) || l:changes[l:path].del[-1] != l:lnum
-          call add(l:changes[l:path].del, l:lnum)
+        if l:bp > 0
+          call s:FlushBlock(l:changes[l:path], l:bs, l:bm, l:bp)
+          let l:bm = 0
+          let l:bp = 0
         endif
+        if l:bm == 0
+          let l:bs = l:new
+        endif
+        let l:bm += 1
         let l:old_rem -= 1
       elseif l:ch ==# '\'
         " '\ No newline at end of file'
       else
+        if l:bm || l:bp
+          call s:FlushBlock(l:changes[l:path], l:bs, l:bm, l:bp)
+          let l:bm = 0
+          let l:bp = 0
+        endif
         let l:new += 1
         let l:old_rem -= 1
         let l:new_rem -= 1
       endif
-    elseif l:line =~# '^diff --git '
+      continue
+    endif
+    if (l:bm || l:bp) && !empty(l:path)
+      call s:FlushBlock(l:changes[l:path], l:bs, l:bm, l:bp)
+      let l:bm = 0
+      let l:bp = 0
+    endif
+    if l:line =~# '^diff --git '
       let l:path = ''
       let l:minus = ''
     elseif l:line =~# '^--- '
@@ -236,7 +262,8 @@ function! s:ParseDiff(lines) abort
       endif
       if !empty(l:path)
         call add(l:files, l:path)
-        let l:changes[l:path] = {'add': [], 'del': [], 'deleted': l:deleted}
+        let l:changes[l:path] =
+              \ {'add': [], 'chg': [], 'del': [], 'deleted': l:deleted}
       endif
     elseif l:line =~# '^@@' && !empty(l:path)
       let l:m = matchlist(l:line,
@@ -248,7 +275,29 @@ function! s:ParseDiff(lines) abort
       endif
     endif
   endfor
+  if (l:bm || l:bp) && !empty(l:path)
+    call s:FlushBlock(l:changes[l:path], l:bs, l:bm, l:bp)
+  endif
   return [l:files, l:changes]
+endfunction
+
+" Classify one run of a:bm removed and a:bp added lines starting at line
+" a:bs (new version): pairs are changed lines, surplus additions are new
+" lines, surplus removals leave a deletion marker after the run.
+function! s:FlushBlock(info, bs, bm, bp) abort
+  let l:paired = min([a:bm, a:bp])
+  for l:i in range(l:paired)
+    call add(a:info.chg, a:bs + l:i)
+  endfor
+  for l:i in range(l:paired, a:bp - 1)
+    call add(a:info.add, a:bs + l:i)
+  endfor
+  if a:bm > a:bp
+    let l:lnum = max([a:bs + a:bp, 1])
+    if empty(a:info.del) || a:info.del[-1] != l:lnum
+      call add(a:info.del, l:lnum)
+    endif
+  endif
 endfunction
 
 " Fetch review comments (attached to file lines) and issue comments (the PR
@@ -592,7 +641,7 @@ function! s:PlaceSigns(buf, path) abort
       call sign_place(0, 'gtdpr', 'GitTreeDiffPrDel', a:buf,
             \ {'lnum': min([l:lnum, l:max]), 'priority': 10})
     endfor
-    for l:lnum in get(l:info, 'add', [])
+    for l:lnum in get(l:info, 'add', []) + get(l:info, 'chg', [])
       if l:lnum <= l:max
         call sign_place(0, 'gtdpr', 'GitTreeDiffPrAdd', a:buf,
               \ {'lnum': l:lnum, 'priority': 10})
@@ -615,7 +664,8 @@ function! s:PlaceSigns(buf, path) abort
           \ a:buf, {'lnum': str2nr(l:lnum), 'priority': l:unresolved ? 20 : 12})
   endfor
   " for a checked-out working tree file, mark local modifications relative
-  " to the pull request head in red
+  " to the pull request head: green for added, blue for changed lines and
+  " orange where lines were deleted
   if empty(getbufvar(a:buf, '&buftype'))
     let [l:derr, l:dout] = git_tree_diff#git(t:gtd_pr.root,
           \ 'diff ' . shellescape(t:gtd_pr.head) . ' -- ' . shellescape(a:path))
@@ -626,11 +676,15 @@ function! s:PlaceSigns(buf, path) abort
         call sign_place(0, 'gtdpr', 'GitTreeDiffPrLocalDel', a:buf,
               \ {'lnum': min([l:lnum, l:max]), 'priority': 15})
       endfor
-      for l:lnum in get(l:linfo, 'add', [])
-        if l:lnum <= l:max
-          call sign_place(0, 'gtdpr', 'GitTreeDiffPrLocal', a:buf,
-                \ {'lnum': l:lnum, 'priority': 15})
-        endif
+      for [l:sign, l:lnums] in [
+            \ ['GitTreeDiffPrLocalAdd', get(l:linfo, 'add', [])],
+            \ ['GitTreeDiffPrLocalChg', get(l:linfo, 'chg', [])]]
+        for l:lnum in l:lnums
+          if l:lnum <= l:max
+            call sign_place(0, 'gtdpr', l:sign, a:buf,
+                  \ {'lnum': l:lnum, 'priority': 15})
+          endif
+        endfor
       endfor
     endif
   endif

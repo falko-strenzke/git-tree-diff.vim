@@ -226,10 +226,13 @@ you.  Otherwise a read-only buffer named gtd-pr://{rev}/{path} is shown.
 A file deleted by the pull request is shown in its base version.
 
 For a checked-out file, local modifications relative to the pull request
-head version are additionally marked in red in the gutter (red ┃ for
-changed lines, red ▁ for deletions; highlight group
-GitTreeDiffPrLocalSign).  The red marks are recomputed every time the
-file is saved.
+head version are additionally marked in the gutter:
+
+    green ┃  (GitTreeDiffPrLocalAddSign)  locally added line
+    blue ┃   (GitTreeDiffPrLocalChgSign)  locally changed line
+    orange ▁ (GitTreeDiffPrLocalDelSign)  lines were locally deleted above
+
+These marks are recomputed every time the file is saved.
 
 In the file window, <Leader>fc (or |:FGitPrOpenComment|) on a line with a
 "C" sign opens the comment thread of that line in a markdown window at the

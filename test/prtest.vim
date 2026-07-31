@@ -61,7 +61,7 @@ try
   let s:signs = sign_getplaced(s:fbuf, {'group': 'gtdpr'})[0].signs
   let s:sn = sort(map(copy(s:signs), 'printf("%d:%s", v:val.lnum, v:val.name)'))
   call Check('main signs', s:sn ==# ['2:GitTreeDiffPrAdd', '5:GitTreeDiffPrAdd',
-        \ '5:GitTreeDiffPrComment', '5:GitTreeDiffPrDel'])
+        \ '5:GitTreeDiffPrComment'])
 
   " deleted file shows the base version
   call cursor(7, 1)

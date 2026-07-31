@@ -53,7 +53,8 @@ request is checked out (HEAD is the PR head commit, or the current branch
 is the PR branch — possibly with additional local commits on top), the
 real file is edited — even with local unstaged or uncommitted changes — so
 it can be modified and saved; local modifications relative to the PR head
-version are marked in red in the gutter and recomputed on every save.
+version get their own gutter marks — green `┃` for added, blue `┃` for
+changed lines, orange `▁` for deletions — recomputed on every save.
 `:FGitPrCheckoutBranch` checks the branch out for you.
 
 | Command                 | Action                                            |

@@ -12,7 +12,10 @@ highlight default link GitTreeDiffPrAddSign DiffAdd
 highlight default link GitTreeDiffPrDelSign DiffDelete
 highlight default link GitTreeDiffPrCommentSign Search
 highlight default link GitTreeDiffPrCommentDoneSign Comment
-highlight default GitTreeDiffPrLocalSign ctermfg=Red guifg=Red
+" local uncommitted/unpushed modifications relative to the PR head
+highlight default GitTreeDiffPrLocalAddSign ctermfg=Green guifg=LimeGreen
+highlight default GitTreeDiffPrLocalChgSign ctermfg=Blue guifg=RoyalBlue
+highlight default GitTreeDiffPrLocalDelSign ctermfg=214 guifg=Orange
 
 " Highlight of the commented code line while its comment is shown, see
 " g:git_tree_diff_pr_highlight_style.
@@ -35,10 +38,12 @@ if exists('*sign_define')
         \ {'text': 'C', 'texthl': 'GitTreeDiffPrCommentSign'})
   call sign_define('GitTreeDiffPrCommentDone',
         \ {'text': 'C', 'texthl': 'GitTreeDiffPrCommentDoneSign'})
-  call sign_define('GitTreeDiffPrLocal',
-        \ {'text': '┃', 'texthl': 'GitTreeDiffPrLocalSign'})
+  call sign_define('GitTreeDiffPrLocalAdd',
+        \ {'text': '┃', 'texthl': 'GitTreeDiffPrLocalAddSign'})
+  call sign_define('GitTreeDiffPrLocalChg',
+        \ {'text': '┃', 'texthl': 'GitTreeDiffPrLocalChgSign'})
   call sign_define('GitTreeDiffPrLocalDel',
-        \ {'text': '▁', 'texthl': 'GitTreeDiffPrLocalSign'})
+        \ {'text': '▁', 'texthl': 'GitTreeDiffPrLocalDelSign'})
 endif
 
 " All arguments are handed through to the underlying 'git diff' invocation.

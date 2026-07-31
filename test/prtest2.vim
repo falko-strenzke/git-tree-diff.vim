@@ -35,11 +35,11 @@ try
   call Check('worktree local content',
         \ getbufline(s:fbuf, 1, '$') ==# ['#ifndef FROB_H',
         \ '#define FROB_H 1', '#endif', 'new local line'])
-  " PR adds 1-3; local changes in red: line 2 modified, line 4 appended
+  " PR adds 1-3; local: line 2 changed (blue), line 4 added (green)
   call Check('worktree signs', s:Signs(s:fbuf) ==# ['1:GitTreeDiffPrAdd',
         \ '2:GitTreeDiffPrAdd', '2:GitTreeDiffPrCommentDone',
-        \ '2:GitTreeDiffPrLocal', '2:GitTreeDiffPrLocalDel',
-        \ '3:GitTreeDiffPrAdd', '4:GitTreeDiffPrLocal'])
+        \ '2:GitTreeDiffPrLocalChg',
+        \ '3:GitTreeDiffPrAdd', '4:GitTreeDiffPrLocalAdd'])
 
   " tree: C sign only on the file with the unresolved comment (main.c)
   call Check('tree comment sign', s:Signs(winbufnr(win_id2win(t:gtd_pr.tree_win)))
@@ -61,17 +61,17 @@ try
         \ && bufname(s:fbuf) =~# 'main\.c')
   call win_execute(t:gtd_pr.file_win, 'let g:jline = line(".")')
   call Check('jump local line', g:jline == 5)
-  " main.c is locally unmodified: no red signs
+  " main.c is locally unmodified: no local signs
   call Check('no local signs',
         \ empty(filter(s:Signs(s:fbuf), 'v:val =~# "Local"')))
 
-  " editing and saving the file refreshes the red marks
+  " editing and saving the file refreshes the local marks
   call win_gotoid(t:gtd_pr.file_win)
   call append(line('$'), 'int locally_added;')
   silent write
   call Check('local sign after save',
         \ filter(s:Signs(bufnr('%')), 'v:val =~# "Local"')
-        \ ==# ['7:GitTreeDiffPrLocal'])
+        \ ==# ['7:GitTreeDiffPrLocalAdd'])
 
   " reopening the modified buffer from the tree keeps the unsaved changes
   call setline(1, '#include <stdio.h> /* modified */')
@@ -142,6 +142,20 @@ try
   call Check('multiline suggestion applied', bufname(s:fbuf) =~# 'main\.c'
         \ && getbufline(s:fbuf, 4, 6) ==# ['int main(void) {  /* entry */',
         \ '  return frob() + 1;', '}'])
+
+  " --- local modification signs: pure deletion -----------------------------
+  " reduce frob.h to the PR head version minus its middle line: the only
+  " local sign must be the orange deletion marker
+  call win_execute(t:gtd_pr.file_win, 'silent write')
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(3, 1)
+  call git_tree_diff#pr#comments_select()
+  call win_gotoid(t:gtd_pr.file_win)
+  silent %delete _
+  call setline(1, ['#ifndef FROB_H', '#endif'])
+  silent write
+  call Check('local del sign', filter(s:Signs(bufnr('%')), 'v:val =~# "Local"')
+        \ ==# ['2:GitTreeDiffPrLocalDel'])
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry
