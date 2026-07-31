@@ -395,6 +395,24 @@ try
   FGitPrApplySuggestion
   call Check('apply not on suggestion',
         \ execute('messages') =~# 'not on a suggested change')
+
+  " --- 10. reopening the file tree ------------------------------------------
+  call win_execute(t:gtd_pr.tree_win, 'close')
+  call Check('tree closed', win_id2win(t:gtd_pr.tree_win) == 0)
+  FGitPrFileTreeOpen
+  call Check('tree reopened', win_id2win(t:gtd_pr.tree_win) > 0
+        \ && win_getid() == t:gtd_pr.tree_win
+        \ && win_screenpos(win_id2win(t:gtd_pr.tree_win))[1] == 1
+        \ && &filetype ==# 'gittreediff')
+  call Check('tree reopened content', len(b:gtd_map) == line('$')
+        \ && !empty(filter(copy(b:gtd_map),
+        \ '!empty(v:val) && !v:val.isdir && v:val.path ==# "src/main.c"')))
+  " the file shown in the file window is selected again
+  call Check('tree reopened selection', getline(line('.')) =~# 'frob\.h')
+  " when already visible, the tree window is only focused
+  call win_gotoid(t:gtd_pr.file_win)
+  FGitPrFileTreeOpen
+  call Check('tree open focuses', win_getid() == t:gtd_pr.tree_win)
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry

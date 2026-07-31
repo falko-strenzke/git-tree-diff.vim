@@ -60,6 +60,7 @@ version are marked in red in the gutter and recomputed on every save.
 |-------------------------|---------------------------------------------------|
 | `:FGitPrList`           | List open pull requests                           |
 | `:FGitPrOfCurrentBranch`| Open the PR of the checked-out branch             |
+| `:FGitPrFileTreeOpen`   | Reopen the PR file tree side bar                  |
 | `:FGitPrOpenComment`    | Open the comment on the current line (`<leader>fc`) |
 | `:FGitPrCommentsOpen`   | List all PR comments (also `Close` and `Toggle`)  |
 | `:FGitPrReply`          | Reply to the selected comment                     |

@@ -71,6 +71,14 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     different base branches), a pull request list window showing only
     those pull requests is opened instead.
 
+                                                          *:FGitPrFileTreeOpen*
+:FGitPrFileTreeOpen
+    Reopen the file tree window of the pull request of the current tab in
+    the left side bar, e.g. after it was closed manually.  The tree is
+    rebuilt with its "C" marks and the file currently shown in the file
+    window is selected.  If the tree window is already visible it is only
+    focused.
+
                                                            *:FGitPrOpenComment*
 :FGitPrOpenComment
     In a pull request file window: open the comment thread on the current

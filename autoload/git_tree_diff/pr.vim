@@ -442,6 +442,30 @@ function! s:SetupPrTreeBuffer() abort
   nnoremap <buffer> <silent> q :tabclose<CR>
 endfunction
 
+" Reopen the file tree window in the left side bar (:FGitPrFileTreeOpen),
+" e.g. after it was closed manually.  If it is already visible it is only
+" focused.
+function! git_tree_diff#pr#file_tree_open() abort
+  if !exists('t:gtd_pr')
+    return s:Error('no pull request open in this tab (use :FGitPrList)')
+  endif
+  if win_id2win(t:gtd_pr.tree_win)
+    call win_gotoid(t:gtd_pr.tree_win)
+    return
+  endif
+  topleft vertical new
+  let t:gtd_pr.tree_win = win_getid()
+  execute 'vertical resize ' . get(g:, 'git_tree_diff_width', 34)
+  call s:SetupPrTreeBuffer()
+  call s:PlaceTreeSigns()
+  " select the file currently shown in the file window
+  let l:path = win_id2win(t:gtd_pr.file_win)
+        \ ? getbufvar(winbufnr(t:gtd_pr.file_win), 'gtd_pr_path', '') : ''
+  if !empty(l:path)
+    call s:MarkTreeFile(l:path)
+  endif
+endfunction
+
 function! git_tree_diff#pr#tree_select() abort
   let l:entry = get(get(b:, 'gtd_map', []), line('.') - 1, {})
   if empty(l:entry) || !exists('t:gtd_pr')
