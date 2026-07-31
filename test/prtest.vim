@@ -413,6 +413,25 @@ try
   call win_gotoid(t:gtd_pr.file_win)
   FGitPrFileTreeOpen
   call Check('tree open focuses', win_getid() == t:gtd_pr.tree_win)
+
+  " --- 11. stale commented-line highlight -----------------------------------
+  " the @dave thread is still shown: its line highlight is in the file window
+  call win_gotoid(t:gtd_pr.file_win)
+  call Check('line match present', exists('w:gtd_pr_line_match')
+        \ && w:gtd_pr_line_path ==# 'src/frob.h')
+  " switching the buffer outside the plugin must clear the highlight
+  enew
+  call Check('line match cleared on buffer switch',
+        \ !exists('w:gtd_pr_line_match') && !exists('w:gtd_pr_line_path'))
+  " reopening a comment re-adds it; closing the comment window removes it
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(3, 1)
+  call git_tree_diff#pr#comments_select()
+  call win_gotoid(t:gtd_pr.file_win)
+  call Check('line match re-added', exists('w:gtd_pr_line_match'))
+  call win_execute(t:gtd_pr.comment_win, 'close')
+  call Check('line match cleared on comment close',
+        \ !exists('w:gtd_pr_line_match'))
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry

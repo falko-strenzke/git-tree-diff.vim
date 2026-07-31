@@ -247,7 +247,9 @@ For review comments the first line of the comment window states whether
 the conversation is resolved or unresolved.  While the comment is shown,
 the commented line is highlighted in the code window if that window
 currently shows the commented file; the highlight style is configured with
-|g:git_tree_diff_pr_highlight_style|.
+|g:git_tree_diff_pr_highlight_style|.  The highlight is removed as soon as
+the window shows a different file (also for buffer switches made outside
+the plugin) or the comment window is closed.
 
                                                      *git-tree-diff-pr-comments*
 |:FGitPrCommentsOpen| lists all comments of the pull request in a window at

@@ -506,6 +506,7 @@ function! s:OpenFile(path) abort
   if exists('w:gtd_pr_line_match')
     silent! call matchdelete(w:gtd_pr_line_match)
     unlet w:gtd_pr_line_match
+    unlet! w:gtd_pr_line_path
   endif
   let l:info = get(t:gtd_pr.changes, a:path,
         \ {'add': [], 'del': [], 'deleted': 0})
@@ -774,24 +775,53 @@ endfunction
 " While a comment is shown, highlight the commented line in the code window
 " if that window currently shows the commented file.
 function! s:HighlightCommentLine(c) abort
+  call git_tree_diff#pr#clear_line_match()
   if !win_id2win(t:gtd_pr.file_win)
+    return
+  endif
+  let l:buf = winbufnr(t:gtd_pr.file_win)
+  let l:max = get(get(getbufinfo(l:buf), 0, {}), 'linecount', 0)
+  if a:c.kind ==# 'review' && !empty(a:c.path)
+        \ && a:c.line > 0 && a:c.line <= l:max
+        \ && getbufvar(l:buf, 'gtd_pr_path', '') ==# a:c.path
+    call win_execute(t:gtd_pr.file_win, [
+          \ 'let w:gtd_pr_line_match = '
+          \ . 'matchaddpos("GitTreeDiffPrCommentLine", [' . a:c.line . '])',
+          \ 'let w:gtd_pr_line_path = ' . string(a:c.path)])
+  endif
+endfunction
+
+" Remove the commented-line highlight from the file window (e.g. when the
+" comment window is closed).
+function! git_tree_diff#pr#clear_line_match() abort
+  if !exists('t:gtd_pr') || !win_id2win(t:gtd_pr.file_win)
     return
   endif
   call win_execute(t:gtd_pr.file_win, [
         \ 'if exists("w:gtd_pr_line_match")',
         \ '  silent! call matchdelete(w:gtd_pr_line_match)',
         \ '  unlet w:gtd_pr_line_match',
+        \ '  unlet! w:gtd_pr_line_path',
         \ 'endif'])
-  let l:buf = winbufnr(t:gtd_pr.file_win)
-  let l:max = get(get(getbufinfo(l:buf), 0, {}), 'linecount', 0)
-  if a:c.kind ==# 'review' && !empty(a:c.path)
-        \ && a:c.line > 0 && a:c.line <= l:max
-        \ && getbufvar(l:buf, 'gtd_pr_path', '') ==# a:c.path
-    call win_execute(t:gtd_pr.file_win,
-          \ 'let w:gtd_pr_line_match = '
-          \ . 'matchaddpos("GitTreeDiffPrCommentLine", [' . a:c.line . '])')
+endfunction
+
+" The highlight is a window-local match: it survives buffer switches done
+" outside the plugin (:e, :b, gf, tag jumps, ...) and would then underline
+" an unrelated file.  Drop it as soon as the window shows a different file
+" than the one it was created for.
+function! git_tree_diff#pr#check_line_match() abort
+  if exists('w:gtd_pr_line_match')
+        \ && get(b:, 'gtd_pr_path', '') !=# get(w:, 'gtd_pr_line_path', '')
+    silent! call matchdelete(w:gtd_pr_line_match)
+    unlet w:gtd_pr_line_match
+    unlet! w:gtd_pr_line_path
   endif
 endfunction
+
+augroup gtdpr_line_match
+  autocmd!
+  autocmd BufEnter * call git_tree_diff#pr#check_line_match()
+augroup END
 
 " Show a:lines in the comment window.  a:conv, when non-empty, is a per-line
 " list mapping each buffer line to the comment it belongs to (used by the
@@ -816,6 +846,8 @@ function! s:FillCommentWin(lines, name, conv, sugg) abort
   nnoremap <buffer> <silent> q :close<CR>
   nnoremap <buffer> <silent> r :FGitPrReply<CR>
   nnoremap <buffer> <silent> a :FGitPrApplySuggestion<CR>
+  " no comment shown means no commented-line highlight
+  autocmd BufWinLeave <buffer> call git_tree_diff#pr#clear_line_match()
   call win_gotoid(l:cur)
 endfunction
 
