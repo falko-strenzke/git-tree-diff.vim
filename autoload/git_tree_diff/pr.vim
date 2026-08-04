@@ -262,8 +262,10 @@ function! s:ParseDiff(lines) abort
       endif
       if !empty(l:path)
         call add(l:files, l:path)
+        " one-letter file status: added files have no '--- a/' side
         let l:changes[l:path] =
-              \ {'add': [], 'chg': [], 'del': [], 'deleted': l:deleted}
+              \ {'add': [], 'chg': [], 'del': [], 'deleted': l:deleted,
+              \ 'status': l:deleted ? 'D' : empty(l:minus) ? 'A' : 'M'}
       endif
     elseif l:line =~# '^@@' && !empty(l:path)
       let l:m = matchlist(l:line,
@@ -477,8 +479,13 @@ function! s:SetupPrTreeBuffer() abort
   setlocal foldtext=git_tree_diff#foldtext()
   silent! execute 'setlocal fillchars+=fold:\ '
 
+  " same status icons and colors as in the :FGitTreeDiff tree
+  let l:status = {}
+  for l:f in t:gtd_pr.files
+    let l:status[l:f] = get(get(t:gtd_pr.changes, l:f, {}), 'status', '')
+  endfor
   let [l:lines, l:map] = git_tree_diff#tree_lines(t:gtd_pr.files,
-        \ ['PR #' . t:gtd_pr.number, t:gtd_pr.title, ''])
+        \ ['PR #' . t:gtd_pr.number, t:gtd_pr.title, ''], l:status)
   let b:gtd_map = l:map
   call setline(1, l:lines)
   setlocal nomodifiable
@@ -1251,6 +1258,11 @@ function! git_tree_diff#pr#reply() abort
   if empty(l:c)
     return s:Error('no comment selected (open a comment first)')
   endif
+  " GitHub has no replies to conversation comments (not attached to a line)
+  if l:c.kind !=# 'review'
+    return s:Error('conversation comments cannot be replied to on GitHub;'
+          \ . ' use :FGitPrNewComment instead')
+  endif
   call s:Compose('reply', {'kind': l:c.kind,
         \ 'id': l:c.reply_to != 0 ? l:c.reply_to : l:c.id})
 endfunction
@@ -1350,11 +1362,12 @@ function! s:Submit() abort
     return s:Error('comment is empty, nothing sent')
   endif
 
-  if l:state.type ==# 'reply' && l:state.target.kind ==# 'review'
+  if l:state.type ==# 'reply'
+    " replies exist for review comments only, see git_tree_diff#pr#reply()
     let l:url = 'repos/' . l:state.nwo . '/pulls/' . l:state.number
           \ . '/comments/' . l:state.target.id . '/replies'
   else
-    " replies to conversation comments and new comments are issue comments
+    " new comments are posted to the issue conversation
     let l:url = 'repos/' . l:state.nwo . '/issues/' . l:state.number
           \ . '/comments'
   endif

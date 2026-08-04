@@ -29,7 +29,7 @@ try
   call Check('pr windows', winnr('$') == 2)
   call Check('tree focus', win_getid() == t:gtd_pr.tree_win)
   call Check('tree lines', join(getline(1, '$'), '|') ==#
-        \ 'PR #7|Add frobnicator||src/|  frob.h|  main.c|old.txt')
+        \ 'PR #7|Add frobnicator||src/|  ✚ frob.h|  ● main.c|✖ old.txt')
   call Check('tree width', winwidth(win_id2win(t:gtd_pr.tree_win)) == 34)
   call Check('tree nospell', !&l:spell)
 
@@ -297,6 +297,12 @@ try
   call win_gotoid(t:gtd_pr.list_win)
 
   " --- 6. reply from the comment list ---------------------------------------
+  " a conversation comment (@carol, no file line) cannot be replied to
+  call cursor(1, 1)
+  FGitPrReply
+  call Check('no reply to conversation comment',
+        \ execute('messages') =~# 'conversation comments cannot be replied to'
+        \ && exists('b:gtd_pr_clist'))
   call cursor(5, 1)
   FGitPrReply
   call Check('compose ft', &filetype ==# 'markdown')

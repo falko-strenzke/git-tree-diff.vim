@@ -44,7 +44,8 @@ authenticated).
 `:FGitPrOfCurrentBranch` directly opens the pull request belonging to the
 currently checked-out branch (or a filtered list if there are several).
 Opening one (`<CR>`) creates a new tab with a foldable tree of the changed
-files on the left — like GitHub's "Files changed" view, with a `C` gutter
+files on the left — like GitHub's "Files changed" view, with the same
+status icons and colors as the `:FGitTreeDiff` tree and a `C` gutter
 mark on files that have unresolved review comments — and a file window on
 the right. Opening a file from the tree shows the pull request version
 of the file with gutter signs: `┃` for added/changed lines, `▁` where lines
@@ -90,7 +91,10 @@ list also jumps the file window to the commented line — switching the file
 and opening folds as needed. Replies and new comments are
 written in a markdown buffer and sent to GitHub with `:w`; after posting —
 and after resolving/unresolving — the gutter signs, the comment list and an
-open comment or conversation window update immediately.
+open comment or conversation window update immediately. Only review
+comments (attached to a file line) can be replied to — GitHub has no
+replies to conversation comments, so for those `:FGitPrReply` aborts and
+points to `:FGitPrNewComment`.
 
 ## Tree window mappings
 
