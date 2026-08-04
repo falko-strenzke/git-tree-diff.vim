@@ -267,16 +267,16 @@ try
   doautocmd CursorMoved
   call Check('auto open', bufname(winbufnr(win_id2win(t:gtd_pr.comment_win)))
         \ =~# 'gtd-pr://comment/101')
-  " a line whose conversations are all resolved (frob.h:2) is skipped
+  " a line whose conversations are all resolved (frob.h:2) opens too
   call win_gotoid(t:gtd_pr.tree_win)
   call cursor(5, 1)
   call git_tree_diff#pr#tree_select()
   call win_gotoid(t:gtd_pr.file_win)
   call cursor(2, 1)
   doautocmd CursorMoved
-  call Check('auto open skips resolved',
+  call Check('auto open opens resolved',
         \ bufname(winbufnr(win_id2win(t:gtd_pr.comment_win)))
-        \ =~# 'gtd-pr://comment/101')
+        \ =~# 'gtd-pr://comment/103')
   " back to main.c for the remaining tests
   call win_gotoid(t:gtd_pr.tree_win)
   call cursor(6, 1)
@@ -432,6 +432,50 @@ try
   call win_execute(t:gtd_pr.comment_win, 'close')
   call Check('line match cleared on comment close',
         \ !exists('w:gtd_pr_line_match'))
+
+  " --- 12. note about further conversations on the same line ----------------
+  " two independent threads on main.c:5; a fresh PR tab picks them up
+  call writefile(['[',
+        \ ' {"id": 101, "path": "src/main.c", "line": 5, "original_line": 5,',
+        \ '  "in_reply_to_id": null, "user": {"login": "alice"},',
+        \ '  "created_at": "2026-07-29T10:11:12Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r101",',
+        \ '  "body": "Root one."},',
+        \ ' {"id": 106, "path": "src/main.c", "line": 5, "original_line": 5,',
+        \ '  "in_reply_to_id": null, "user": {"login": "grace"},',
+        \ '  "created_at": "2026-07-30T09:00:00Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r106",',
+        \ '  "body": "Root two."},',
+        \ ' {"id": 103, "path": "src/frob.h", "line": 2, "original_line": 2,',
+        \ '  "in_reply_to_id": null, "user": {"login": "dave"},',
+        \ '  "created_at": "2026-07-27T08:00:00Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r103",',
+        \ '  "body": "Guard comment please."}',
+        \ ']'], s:S . '/fixtures/rev.json')
+  tabfirst
+  call cursor(1, 1)
+  call git_tree_diff#pr#list_select()
+  FGitPrCommentsOpen
+  call cursor(1, 1)
+  call search('@alice')
+  call git_tree_diff#pr#comments_select()
+  call Check('more-on-line note', getbufline(s:CBuf(), '$')[0]
+        \ =~# '^_1 more conversation on this line')
+  " the other thread on the same line carries the note as well
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(1, 1)
+  call search('@grace')
+  call git_tree_diff#pr#comments_select()
+  call Check('note on other thread', getbufline(s:CBuf(), '$')[0]
+        \ =~# '^_1 more conversation on this line')
+  " a line with a single conversation gets no note
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(1, 1)
+  call search('@dave')
+  call git_tree_diff#pr#comments_select()
+  call Check('no note for single thread',
+        \ empty(filter(getbufline(s:CBuf(), 1, '$'),
+        \ 'v:val =~# "more conversation"')))
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry

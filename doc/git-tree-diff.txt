@@ -83,7 +83,10 @@ file in two equally sized windows in Vim's usual |diff-mode|.
 :FGitPrOpenComment
     In a pull request file window: open the comment thread on the current
     line in the comment window at the far right.  Also mapped to
-    <Leader>fc there.  In the comment list: same as <CR>.
+    <Leader>fc there.  In the comment list: same as <CR>.  If further
+    conversations exist on the same line, a note at the bottom of the
+    comment window says so; they can be reached via the comment list
+    (|:FGitPrCommentsOpen|).
 
                                                           *:FGitPrCommentsOpen*
                                                          *:FGitPrCommentsClose*
@@ -155,9 +158,9 @@ file in two equally sized windows in Vim's usual |diff-mode|.
 :FGitPrCommentAutoOpenOff
     Enable or disable automatic comment opening for the current pull
     request (all its code windows): whenever the cursor lands on a line
-    with an unresolved review conversation (a bright "C" marker), that
-    conversation is opened in the comment window automatically.  Resolved
-    conversations are skipped; open them with |:FGitPrOpenComment|.
+    with a review conversation (a "C" marker, resolved or not), that
+    conversation is opened in the comment window automatically.  If a
+    line carries both, an unresolved conversation is preferred.
 
                                                         *:FGitPrCheckoutBranch*
 :FGitPrCheckoutBranch

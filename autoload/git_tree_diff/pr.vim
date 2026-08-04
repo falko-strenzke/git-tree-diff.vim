@@ -788,6 +788,22 @@ function! s:ShowComment(idx) abort
     call extend(l:sugg, s:SuggestionMap(l:m, l:body))
   endfor
 
+  " note when further conversations exist on the same line
+  if l:c.kind ==# 'review' && l:c.line > 0
+    let l:others = len(filter(copy(t:gtd_pr.comments),
+          \ 'v:val.kind ==# "review" && v:val.reply_to == 0'
+          \ . ' && v:val.id != ' . l:root_id
+          \ . ' && v:val.path ==# ' . string(l:c.path)
+          \ . ' && v:val.line == ' . l:c.line))
+    if l:others > 0
+      call extend(l:lines, ['',
+            \ '_' . l:others . ' more conversation'
+            \ . (l:others == 1 ? '' : 's')
+            \ . ' on this line, see :FGitPrCommentsOpen_'])
+      call extend(l:sugg, [{}, {}])
+    endif
+  endif
+
   call s:FillCommentWin(l:lines, 'gtd-pr://comment/' . l:root_id, [], l:sugg)
   call s:HighlightCommentLine(l:c)
 endfunction
@@ -1015,17 +1031,25 @@ function! git_tree_diff#pr#auto_open_check() abort
     return
   endif
   let t:gtd_pr.auto_open_last = [b:gtd_pr_path, line('.')]
+  " resolved conversations open too; an unresolved one on the same line wins
+  let l:found = -1
   for l:i in range(len(t:gtd_pr.comments))
     let l:c = t:gtd_pr.comments[l:i]
-    " resolved conversations are skipped, matching the bright "C" markers
     if l:c.kind ==# 'review' && l:c.path ==# b:gtd_pr_path
-          \ && l:c.line == line('.') && !get(l:c, 'resolved', 0)
-      let l:origin = win_getid()
-      call s:ShowComment(l:i)
-      call win_gotoid(l:origin)
-      return
+          \ && l:c.line == line('.')
+      if !get(l:c, 'resolved', 0)
+        let l:found = l:i
+        break
+      elseif l:found < 0
+        let l:found = l:i
+      endif
     endif
   endfor
+  if l:found >= 0
+    let l:origin = win_getid()
+    call s:ShowComment(l:found)
+    call win_gotoid(l:origin)
+  endif
 endfunction
 
 " ---------------------------------------------------------------------------
