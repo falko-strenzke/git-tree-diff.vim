@@ -8,6 +8,10 @@ endif
 let g:loaded_git_tree_diff = 1
 
 highlight default link GitTreeDiffSelected Visual
+" file status (icon + name) in the :FGitTreeDiff / :FGitLog file tree
+highlight default GitTreeDiffFileAdded ctermfg=Green guifg=LimeGreen
+highlight default GitTreeDiffFileChanged ctermfg=Blue guifg=RoyalBlue
+highlight default GitTreeDiffFileDeleted ctermfg=Red guifg=Red
 highlight default link GitTreeDiffPrAddSign DiffAdd
 highlight default link GitTreeDiffPrDelSign DiffDelete
 highlight default link GitTreeDiffPrCommentSign Search

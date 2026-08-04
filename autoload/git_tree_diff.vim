@@ -6,6 +6,9 @@
 " Sentinel for "the file in the working tree" (as opposed to a git revision).
 let s:WORKTREE = ''
 
+" Tree icons per file status; highlighted via syntax/gittreediff.vim.
+let s:STATUS_ICON = {'A': '✚', 'M': '●', 'D': '✖'}
+
 " ---------------------------------------------------------------------------
 " git helpers
 " ---------------------------------------------------------------------------
@@ -25,10 +28,14 @@ function! git_tree_diff#find_root() abort
   return s:FindRoot()
 endfunction
 
-function! git_tree_diff#tree_lines(files, header) abort
+" Optional third argument: a dict mapping file path -> one-letter status
+" ('A'dded, 'M'odified, 'D'eleted); such files get an icon and (via the
+" gittreediff syntax file) a matching text color.
+function! git_tree_diff#tree_lines(files, header, ...) abort
   let l:lines = copy(a:header)
   let l:map = map(copy(a:header), '{}')
-  call s:RenderTree(s:BuildTree(a:files), 0, '', l:lines, l:map)
+  call s:RenderTree(s:BuildTree(a:files), 0, '', l:lines, l:map,
+        \ a:0 ? a:1 : {})
   return [l:lines, l:map]
 endfunction
 
@@ -106,6 +113,34 @@ function! s:ParseArgs(root, argstr) abort
         \ 'right': s:WORKTREE, 'right_label': 'worktree'}
 endfunction
 
+" Map each file of 'git diff <args>' to a one-letter status: 'A'dded,
+" 'M'odified or 'D'eleted.  A rename counts as deletion of the old plus
+" addition of the new path, a copy as addition, a type change as
+" modification.  Returns an empty dict on error (files then get no icon).
+function! s:FileStatuses(root, args) abort
+  let [l:err, l:out] = s:Git(a:root, 'diff --name-status ' . a:args)
+  if l:err
+    return {}
+  endif
+  let l:status = {}
+  for l:line in l:out
+    let l:parts = split(l:line, "\t")
+    if len(l:parts) < 2
+      continue
+    endif
+    let l:st = l:parts[0][0]
+    if l:st ==# 'R' || l:st ==# 'C'
+      if l:st ==# 'R'
+        let l:status[l:parts[1]] = 'D'
+      endif
+      let l:status[l:parts[-1]] = 'A'
+    else
+      let l:status[l:parts[1]] = l:st ==# 'T' ? 'M' : l:st
+    endif
+  endfor
+  return l:status
+endfunction
+
 " ---------------------------------------------------------------------------
 " entry point
 " ---------------------------------------------------------------------------
@@ -141,13 +176,14 @@ function! git_tree_diff#run(args) abort
         \ 'right_label': l:spec.right_label,
         \ 'log_win': 0, 'tree_win': 0, 'left_win': 0, 'right_win': 0,
         \ }
-  call s:ShowTree(l:files)
+  call s:ShowTree(l:files, s:FileStatuses(l:root, a:args))
 endfunction
 
 " Create (or refresh) the tree window and the two diff windows for the
-" file list in a:files, using the refs stored in t:gtd.  The tree window is
-" placed right of the log window if one exists, otherwise at the far left.
-function! s:ShowTree(files) abort
+" file list in a:files (file path -> status letter in a:status), using the
+" refs stored in t:gtd.  The tree window is placed right of the log window
+" if one exists, otherwise at the far left.
+function! s:ShowTree(files, status) abort
   if !win_id2win(t:gtd.tree_win)
     if win_id2win(t:gtd.log_win)
       call win_gotoid(t:gtd.log_win)
@@ -158,7 +194,7 @@ function! s:ShowTree(files) abort
   endif
   call win_gotoid(t:gtd.tree_win)
   silent enew
-  call s:SetupTreeBuffer(a:files)
+  call s:SetupTreeBuffer(a:files, a:status)
   call s:EnsureWindows()
 
   if win_id2win(t:gtd.log_win)
@@ -202,7 +238,7 @@ function! s:BuildTree(files) abort
   return l:tree
 endfunction
 
-function! s:RenderTree(node, depth, prefix, lines, map) abort
+function! s:RenderTree(node, depth, prefix, lines, map, status) abort
   let l:dirs = []
   let l:files = []
   for l:key in keys(a:node)
@@ -215,15 +251,17 @@ function! s:RenderTree(node, depth, prefix, lines, map) abort
     call add(a:lines, l:indent . l:dir . '/')
     call add(a:map, {'isdir': 1, 'path': a:prefix . l:dir})
     call s:RenderTree(a:node[l:dir], a:depth + 1, a:prefix . l:dir . '/',
-          \ a:lines, a:map)
+          \ a:lines, a:map, a:status)
   endfor
   for l:file in l:files
-    call add(a:lines, l:indent . l:file)
-    call add(a:map, {'isdir': 0, 'path': a:prefix . l:file})
+    let l:st = get(a:status, a:prefix . l:file, '')
+    let l:icon = get(s:STATUS_ICON, l:st, '')
+    call add(a:lines, l:indent . (empty(l:icon) ? '' : l:icon . ' ') . l:file)
+    call add(a:map, {'isdir': 0, 'path': a:prefix . l:file, 'status': l:st})
   endfor
 endfunction
 
-function! s:SetupTreeBuffer(files) abort
+function! s:SetupTreeBuffer(files, status) abort
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   setlocal nonumber norelativenumber nowrap nolist nospell
   setlocal winfixwidth cursorline signcolumn=no
@@ -234,7 +272,7 @@ function! s:SetupTreeBuffer(files) abort
 
   let [l:lines, l:map] = git_tree_diff#tree_lines(a:files,
         \ [fnamemodify(t:gtd.root, ':t'),
-        \ t:gtd.left_label . ' → ' . t:gtd.right_label, ''])
+        \ t:gtd.left_label . ' → ' . t:gtd.right_label, ''], a:status)
   let b:gtd_map = l:map
   call setline(1, l:lines)
   setlocal nomodifiable
@@ -466,5 +504,6 @@ function! s:ShowCommit(sha) abort
   let t:gtd.left_label = l:parent_label
   let t:gtd.right_ref = a:sha
   let t:gtd.right_label = strpart(a:sha, 0, 10)
-  call s:ShowTree(l:files)
+  call s:ShowTree(l:files, s:FileStatuses(t:gtd.root,
+        \ shellescape(l:parent) . ' ' . shellescape(a:sha)))
 endfunction

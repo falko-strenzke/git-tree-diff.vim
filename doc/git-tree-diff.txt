@@ -177,6 +177,17 @@ file in two equally sized windows in Vim's usual |diff-mode|.
 The first two lines show the repository name and the compared revisions.
 Directories end with a "/" and can be folded with the usual |fold-commands|.
 
+Each file carries an icon and a text color showing how it changed between
+the compared versions (a renamed file counts as its old path deleted and
+its new path added):
+
+    green ✚   (GitTreeDiffFileAdded)    added file
+    blue ●    (GitTreeDiffFileChanged)  modified file
+    red ✖     (GitTreeDiffFileDeleted)  deleted file
+
+The colors can be adjusted by redefining these highlight groups with
+|:highlight| after the plugin was loaded.
+
 Mappings in the tree window:
 
     <CR>            On a file: show its diff in the right-hand windows.

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Headless test harness for the pull request features.  Needs vim and git;
+# Headless test harness for the pull request features and the tree view.
+# Needs vim and git;
 # all GitHub access is served by the ./gh stub.  Mutable state (fixture
 # copies, throwaway git repos, logs, results) lives in a temporary work
 # directory exported as $GTD_TEST_DIR.
@@ -27,19 +28,36 @@ sed -i 's/^#define FROB_H$/#define FROB_H 1/' src/frob.h
 git commit -qam 'local commit on top'
 echo 'new local line' >> src/frob.h
 
+# repo3: a plain history for the :FGitTreeDiff tree view tests, with one
+# modified, one deleted, one added and one renamed file between the commits
+mkdir -p "$W/repo3/sub"
+cd "$W/repo3"
+git init -q .
+printf 'one\ntwo\n' > a.txt
+printf 'bee\n' > b.txt
+printf 'cee cee cee\n' > sub/c.txt
+git add -A && git commit -qm c1
+printf 'one\nTWO\n' > a.txt
+git rm -q b.txt
+printf 'dee\n' > d.txt
+git mv sub/c.txt sub/e.txt
+git add -A && git commit -qm c2
+
 cd "$W/repo" && timeout 60 vim -N -u NONE -i NONE -n -es -S "$S/prtest.vim" </dev/null >/dev/null 2>&1
 # suite 1 mutates rev.json and graphql.json; restore them for suite 2
 cp "$S/fixtures/rev.json" "$S/fixtures/graphql.json" "$W/fixtures/"
 cd "$W/repo2" && timeout 60 vim -N -u NONE -i NONE -n -es -S "$S/prtest2.vim" </dev/null >/dev/null 2>&1
+cd "$W/repo3" && timeout 60 vim -N -u NONE -i NONE -n -es -S "$S/treetest.vim" </dev/null >/dev/null 2>&1
 
 ok=0
-for r in results.txt results2.txt; do
+for r in results.txt results2.txt results3.txt; do
   [ -s "$W/$r" ] || { echo "missing $r (suite did not finish)"; ok=1; }
 done
 echo "suite 1: $(grep -c '^PASS' "$W/results.txt" 2>/dev/null)/$(wc -l < "$W/results.txt" 2>/dev/null) passed"
 echo "suite 2: $(grep -c '^PASS' "$W/results2.txt" 2>/dev/null)/$(wc -l < "$W/results2.txt" 2>/dev/null) passed"
-if grep -hv '^PASS' "$W/results.txt" "$W/results2.txt" 2>/dev/null | grep -q .; then
-  grep -hv '^PASS' "$W/results.txt" "$W/results2.txt" 2>/dev/null
+echo "suite 3: $(grep -c '^PASS' "$W/results3.txt" 2>/dev/null)/$(wc -l < "$W/results3.txt" 2>/dev/null) passed"
+if grep -hv '^PASS' "$W/results.txt" "$W/results2.txt" "$W/results3.txt" 2>/dev/null | grep -q .; then
+  grep -hv '^PASS' "$W/results.txt" "$W/results2.txt" "$W/results3.txt" 2>/dev/null
   ok=1
 else
   echo "-- no failures --"

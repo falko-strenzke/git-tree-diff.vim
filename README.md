@@ -5,7 +5,8 @@ Browse a `git diff` as a file tree with side-by-side diff windows.
 `:FGitTreeDiff` opens a new tab page with:
 
 - a browsable, foldable file tree on the far left, showing only the files
-  that have a non-empty diff,
+  that have a non-empty diff — each with an icon and text color for its
+  status: green `✚` added, blue `●` modified, red `✖` deleted,
 - two equally sized windows on the right showing the two compared versions
   of the selected file in Vim's usual diff view.
 
