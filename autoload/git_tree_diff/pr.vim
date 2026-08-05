@@ -173,10 +173,13 @@ function! s:OpenPr(root, number) abort
         \ 'files': l:files,
         \ 'changes': l:changes,
         \ 'comments': l:comments,
+        \ 'comments_time': localtime(),
+        \ 'head_files': {},
         \ 'current': {},
         \ 'tree_win': win_getid(),
         \ 'file_win': 0, 'comment_win': 0, 'list_win': 0,
         \ }
+  call s:RelocateComments()
   call s:SetupPrTreeBuffer()
   call s:PlaceTreeSigns()
 
@@ -321,6 +324,7 @@ function! s:FetchComments(root, nwo, number) abort
       let l:start = s:Num(l:c, 'start_line')
       let l:path = get(l:c, 'path', '')
       let l:url = get(l:c, 'html_url', '')
+      let l:hunk = get(l:c, 'diff_hunk', '')
       call add(l:comments, {
             \ 'kind': l:kind,
             \ 'id': l:c.id,
@@ -328,6 +332,10 @@ function! s:FetchComments(root, nwo, number) abort
             \ 'line': l:line > 0 ? l:line : s:Num(l:c, 'original_line'),
             \ 'start_line': l:start > 0 ? l:start
             \   : s:Num(l:c, 'original_start_line'),
+            \ 'outdated': l:kind ==# 'review' && l:line <= 0,
+            \ 'hunk_line': type(l:hunk) == v:t_string && !empty(l:hunk)
+            \   ? split(l:hunk, "\n")[-1][1:] : '',
+            \ 'moved_from': 0,
             \ 'reply_to': s:Num(l:c, 'in_reply_to_id'),
             \ 'user': get(get(l:c, 'user', {}), 'login', '?'),
             \ 'time': s:FmtTime(get(l:c, 'created_at', '')),
@@ -350,6 +358,45 @@ function! s:FetchComments(root, nwo, number) abort
   " conversation comments first, then review comments grouped by file/line
   call sort(l:comments, function('s:CompareComments'))
   return l:comments
+endfunction
+
+" A review comment on an outdated diff carries only its original line number,
+" which may no longer fit the pull request head version of the file.  If the
+" originally commented line's text (the last line of the comment's diff hunk)
+" occurs exactly once in the head version, move the comment there; the
+" comment window points out the relocation.
+function! s:RelocateComments() abort
+  for l:c in t:gtd_pr.comments
+    if l:c.kind !=# 'review' || !l:c.outdated || empty(l:c.path)
+          \ || l:c.hunk_line !~# '\S'
+          \ || get(get(t:gtd_pr.changes, l:c.path, {}), 'deleted', 0)
+      continue
+    endif
+    " the head version is immutable while the tab is open: cache the contents
+    if !has_key(t:gtd_pr.head_files, l:c.path)
+      let t:gtd_pr.head_files[l:c.path] =
+            \ s:FileContent(t:gtd_pr.head, l:c.path)
+    endif
+    let l:content = t:gtd_pr.head_files[l:c.path]
+    let l:new = 0
+    for l:i in range(len(l:content))
+      if l:content[l:i] ==# l:c.hunk_line
+        if l:new > 0
+          let l:new = 0
+          break
+        endif
+        let l:new = l:i + 1
+      endif
+    endfor
+    if l:new > 0 && l:new != l:c.line
+      let l:c.moved_from = l:c.line
+      if l:c.start_line > 0
+        let l:c.start_line += l:new - l:c.line
+      endif
+      let l:c.line = l:new
+    endif
+  endfor
+  call sort(t:gtd_pr.comments, function('s:CompareComments'))
 endfunction
 
 " Thread resolution is only available via the GraphQL API.  Returns a map of
@@ -534,6 +581,7 @@ function! git_tree_diff#pr#tree_select() abort
       silent! normal! zc
     endif
   else
+    call s:FreshComments()
     call git_tree_diff#mark_selected(line('.'))
     let l:origin = win_getid()
     call s:OpenFile(l:entry.path)
@@ -737,6 +785,7 @@ function! git_tree_diff#pr#open_comment() abort
   if !exists('t:gtd_pr')
     return s:Error('no pull request open in this tab (use :FGitPrList)')
   endif
+  call s:FreshComments()
   if exists('b:gtd_pr_clist')
     return git_tree_diff#pr#comments_select()
   endif
@@ -787,6 +836,17 @@ function! s:ShowComment(idx) abort
   endif
   let l:lines = [l:title]
   let l:sugg = [{}]
+  " an outdated comment sits at a line number from an old diff; it may have
+  " been relocated to the matching line by s:RelocateComments()
+  if get(l:c, 'moved_from', 0) > 0
+    call add(l:lines, '_outdated comment: relocated from original line '
+          \ . l:c.moved_from . ' by its line content_')
+    call add(l:sugg, {})
+  elseif l:c.kind ==# 'review' && get(l:c, 'outdated', 0) && l:c.line > 0
+    call add(l:lines, '_outdated comment: line ' . l:c.line
+          \ . ' refers to an old version of the file_')
+    call add(l:sugg, {})
+  endif
   for l:m in l:thread
     call extend(l:lines, ['', '## @' . l:m.user . ' · ' . l:m.time, ''])
     call extend(l:sugg, [{}, {}, {}])
@@ -934,6 +994,7 @@ function! git_tree_diff#pr#open_conversation() abort
   if !exists('t:gtd_pr')
     return s:Error('no pull request open in this tab (use :FGitPrList)')
   endif
+  call s:FreshComments()
   call s:RenderConversation()
   call win_gotoid(t:gtd_pr.comment_win)
 endfunction
@@ -1038,6 +1099,7 @@ function! git_tree_diff#pr#auto_open_check() abort
     return
   endif
   let t:gtd_pr.auto_open_last = [b:gtd_pr_path, line('.')]
+  call s:FreshComments()
   " resolved conversations open too; an unresolved one on the same line wins
   let l:found = -1
   for l:i in range(len(t:gtd_pr.comments))
@@ -1067,6 +1129,7 @@ function! git_tree_diff#pr#comments_open() abort
   if !exists('t:gtd_pr')
     return s:Error('no pull request open in this tab (use :FGitPrList)')
   endif
+  call s:FreshComments()
   if win_id2win(t:gtd_pr.list_win)
     call win_gotoid(t:gtd_pr.list_win)
     return
@@ -1392,6 +1455,8 @@ function! s:RefreshComments() abort
   endif
   let t:gtd_pr.comments = s:FetchComments(t:gtd_pr.root, t:gtd_pr.nwo,
         \ t:gtd_pr.number)
+  let t:gtd_pr.comments_time = localtime()
+  call s:RelocateComments()
   call s:PlaceTreeSigns()
   if win_id2win(t:gtd_pr.file_win)
     let l:buf = winbufnr(t:gtd_pr.file_win)
@@ -1403,11 +1468,21 @@ function! s:RefreshComments() abort
   if win_id2win(t:gtd_pr.list_win)
     let l:cur = win_getid()
     call win_gotoid(t:gtd_pr.list_win)
+    let l:lnum = line('.')
     silent enew
     call s:SetupCommentsBuffer()
+    call cursor(min([l:lnum, line('$')]), 1)
     call win_gotoid(l:cur)
   endif
   call s:RefreshCommentWin()
+endfunction
+
+" The comment data is cached for one minute after the last load; any later
+" comment access re-fetches it from GitHub.
+function! s:FreshComments() abort
+  if localtime() - get(t:gtd_pr, 'comments_time', 0) >= 60
+    call s:RefreshComments()
+  endif
 endfunction
 
 " Re-render the comment window so that new replies and a changed resolution

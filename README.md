@@ -84,7 +84,14 @@ review); for review comments the first line states
 whether the conversation is resolved, and the commented code line is
 highlighted while the comment is shown (style configurable via
 `g:git_tree_diff_pr_highlight_style`). If further conversations exist on
-the same line, a note at the bottom of the comment window says so. The comment list shows every comment with
+the same line, a note at the bottom of the comment window says so.
+Outdated review comments (their lines no longer appear in the current
+diff) are relocated to the line whose text matches the originally
+commented line — if it is unique in the file — and the comment window
+notes the original line number; otherwise they stay at their original
+line number with a note that it refers to an old version. Comment data
+is cached for one minute; any later comment access re-fetches it from
+GitHub. The comment list shows every comment with
 an author/time header and a preview line; `<CR>` opens the comment,
 `<C-n>`/`<C-p>` jump between comments. Opening a review comment from the
 list also jumps the file window to the commented line — switching the file

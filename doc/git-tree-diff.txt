@@ -275,6 +275,24 @@ currently shows the commented file; the highlight style is configured with
 the window shows a different file (also for buffer switches made outside
 the plugin) or the comment window is closed.
 
+GitHub marks a review comment as outdated when the commented lines no
+longer appear in the current diff; it then reports only the line number in
+the old version.  If the text of the originally commented line occurs
+exactly once in the pull request head version of the file, the plugin
+relocates the comment to that line - the gutter sign, the comment list and
+the line highlight all use the new position, and a note below the title of
+the comment window states the original line number.  If the line's text is
+not found (or not unique), the comment keeps its original line number and
+the note says that it refers to an old version of the file; if that number
+lies beyond the end of the file, the file window shows no "C" sign for it,
+but the comment remains reachable via the comment list.
+
+The comment data is cached for one minute after it was last loaded.  Any
+later comment access - opening a file from the tree, opening a comment,
+the comment list or the conversation, or the automatic comment opening -
+re-fetches the comments from GitHub first and updates the gutter signs,
+the comment list and an open comment window.
+
                                                      *git-tree-diff-pr-comments*
 |:FGitPrCommentsOpen| lists all comments of the pull request in a window at
 the bottom: first the conversation comments, then the review comments

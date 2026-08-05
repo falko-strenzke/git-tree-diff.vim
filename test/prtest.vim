@@ -482,6 +482,85 @@ try
   call Check('no note for single thread',
         \ empty(filter(getbufline(s:CBuf(), 1, '$'),
         \ 'v:val =~# "more conversation"')))
+
+  " --- 13. outdated comments: relocation by line content --------------------
+  " GitHub reports no current line for outdated threads; the plugin falls
+  " back to the original line and, if the commented line's text is unique in
+  " the head version, relocates the comment there
+  call writefile(['[',
+        \ ' {"id": 301, "path": "src/main.c", "line": null,',
+        \ '  "original_line": 99,',
+        \ '  "diff_hunk": "@@ -1,2 +1,2 @@\n+int main(void) {",',
+        \ '  "in_reply_to_id": null, "user": {"login": "rita"},',
+        \ '  "created_at": "2026-08-01T10:00:00Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r301",',
+        \ '  "body": "Outdated but findable."},',
+        \ ' {"id": 302, "path": "src/main.c", "line": null,',
+        \ '  "original_line": 400,',
+        \ '  "diff_hunk": "@@ -1,2 +1,2 @@\n+vanished_line();",',
+        \ '  "in_reply_to_id": null, "user": {"login": "otto"},',
+        \ '  "created_at": "2026-08-01T11:00:00Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r302",',
+        \ '  "body": "Outdated and gone."}',
+        \ ']'], s:S . '/fixtures/rev.json')
+  tabfirst
+  call cursor(1, 1)
+  call git_tree_diff#pr#list_select()
+  let s:reloc = filter(copy(t:gtd_pr.comments), 'v:val.id == 301')[0]
+  call Check('outdated comment relocated',
+        \ s:reloc.line == 4 && s:reloc.moved_from == 99)
+  let s:stay = filter(copy(t:gtd_pr.comments), 'v:val.id == 302')[0]
+  call Check('unmatched outdated comment keeps line',
+        \ s:stay.line == 400 && s:stay.moved_from == 0)
+  " the relocated comment gets its gutter sign at the matched line
+  call win_gotoid(t:gtd_pr.tree_win)
+  call cursor(6, 1)
+  call git_tree_diff#pr#tree_select()
+  let s:msigns = map(sign_getplaced(winbufnr(win_id2win(t:gtd_pr.file_win)),
+        \ {'group': 'gtdpr'})[0].signs,
+        \ 'printf("%d:%s", v:val.lnum, v:val.name)')
+  call Check('relocated comment sign',
+        \ index(s:msigns, '4:GitTreeDiffPrComment') >= 0)
+  " the comment window notes the relocation / the outdated position
+  FGitPrCommentsOpen
+  call cursor(1, 1)
+  call search('@rita')
+  call git_tree_diff#pr#comments_select()
+  call Check('relocation note', getbufline(s:CBuf(), 2)[0]
+        \ =~# '^_outdated comment: relocated from original line 99')
+  call win_gotoid(t:gtd_pr.list_win)
+  call cursor(1, 1)
+  call search('@otto')
+  call git_tree_diff#pr#comments_select()
+  call Check('outdated note', getbufline(s:CBuf(), 2)[0]
+        \ =~# '^_outdated comment: line 400 refers to an old version')
+
+  " --- 14. one-minute comment cache -----------------------------------------
+  " a comment added on github is not picked up while the cache is fresh
+  call writefile(['[',
+        \ ' {"id": 301, "path": "src/main.c", "line": null,',
+        \ '  "original_line": 99,',
+        \ '  "diff_hunk": "@@ -1,2 +1,2 @@\n+int main(void) {",',
+        \ '  "in_reply_to_id": null, "user": {"login": "rita"},',
+        \ '  "created_at": "2026-08-01T10:00:00Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r301",',
+        \ '  "body": "Outdated but findable."},',
+        \ ' {"id": 303, "path": "src/main.c", "line": 5, "original_line": 5,',
+        \ '  "in_reply_to_id": null, "user": {"login": "zoe"},',
+        \ '  "created_at": "2026-08-02T09:00:00Z",',
+        \ '  "html_url": "https://github.com/octo/demo/pull/7#discussion_r303",',
+        \ '  "body": "Fresh from github."}',
+        \ ']'], s:S . '/fixtures/rev.json')
+  FGitPrCommentsOpen
+  call Check('fresh cache not refetched',
+        \ empty(filter(copy(t:gtd_pr.comments), 'v:val.user ==# "zoe"')))
+  " after expiry the next access re-fetches and rebuilds the list
+  let t:gtd_pr.comments_time = 0
+  FGitPrCommentsOpen
+  call Check('expired cache refetched',
+        \ len(filter(copy(t:gtd_pr.comments), 'v:val.user ==# "zoe"')) == 1
+        \ && !empty(filter(getbufline(winbufnr(win_id2win(t:gtd_pr.list_win)),
+        \ 1, '$'), 'v:val =~# "@zoe"')))
 catch
   call add(s:res, 'EXCEPTION: ' . v:exception . ' @ ' . v:throwpoint)
 endtry
