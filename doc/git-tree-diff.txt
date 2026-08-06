@@ -44,6 +44,11 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     scratch buffers named gtd://{rev}/{path}.  When one side is the working
     tree, the actual file is edited, so changes can be made and saved.
 
+    For readable diffs the plugin adds the 'diffopt' items of
+    |g:git_tree_diff_diffopt| (histogram algorithm and line matching by
+    default), and diff anchors keep heavily diverged versions aligned, see
+    |:FGitTreeDiffAutoAnchorsToggle|.
+
                                                                      *:FGitLog*
 :FGitLog [all]
     Open a new tab page with a browsable commit log based on the output of
@@ -55,6 +60,44 @@ file in two equally sized windows in Vim's usual |diff-mode|.
     windows, exactly as for |:FGitTreeDiff|.  The commit is compared
     against its first parent; a root commit is compared against the empty
     tree.  Selecting another commit reuses the same windows.
+
+                                                   *:FGitTreeDiffAutoAnchorsToggle*
+:FGitTreeDiffAutoAnchorsToggle
+    Toggle the automatic diff anchors of the current tab page.
+
+    When the two compared versions of a file differ heavily, the diff
+    algorithm may align unrelated parts: a moved and edited function shows
+    up as deleted on one side and added on the other instead of being
+    compared with its counterpart.  Against this, every line whose text
+    occurs exactly once in both versions - function definitions are the
+    typical case - and that appears in the same order in both versions is
+    used as a diff anchor (see |diff-anchors|): the versions are aligned
+    at the anchor lines and the parts between two anchors are compared
+    separately.  Vim supports at most 20 anchors per buffer; surplus
+    candidates are sampled evenly over the file.
+
+    The anchors are recomputed each time a file is opened from the tree
+    and, for a working tree file, on every save.  The initial state is set
+    with |g:git_tree_diff_auto_anchor|.  Diff anchors require Vim
+    9.1.1243 or later.
+
+                                                      *:FGitTreeDiffAnchorAdd*
+:FGitTreeDiffAnchorAdd
+    Manually anchor a line of one diff window to a line of the other, in
+    two steps (the cursors of the two diff windows are linked, so the two
+    lines cannot be picked at once): put the cursor on a line in one diff
+    window (e.g. a function head) and run the command, then put the cursor
+    on the matching line in the other diff window and run it again.
+
+    Manual anchors take precedence: automatic anchors that would cross a
+    manual one are dropped, and a new manual anchor replaces existing
+    manual anchors crossing it.  Manual anchors are discarded when another
+    file is opened from the tree.
+
+                                                   *:FGitTreeDiffAnchorsClear*
+:FGitTreeDiffAnchorsClear
+    Remove all manual anchors of the current file; the automatic anchors -
+    unless toggled off - remain.
 
                                                                   *:FGitPrList*
 :FGitPrList
@@ -350,6 +393,21 @@ g:git_tree_diff_pr_highlight_style
     comment is shown: "underline", "italic" or "background".  Evaluated
     when the plugin is loaded.  The highlight group GitTreeDiffPrCommentLine
     can also be redefined directly.  Default: "underline"
+
+                                                      *g:git_tree_diff_diffopt*
+g:git_tree_diff_diffopt
+    Comma-separated 'diffopt' items added to the global 'diffopt' when a
+    diff is opened.  An item is skipped if 'diffopt' already contains an
+    item of the same name (e.g. another algorithm: choice) or if this Vim
+    version does not know it.  Note that 'diffopt' is a global option, so
+    the items also affect diffs outside the plugin.  Set to "" to leave
+    'diffopt' alone.
+    Default: "algorithm:histogram,indent-heuristic,linematch:60"
+
+                                                  *g:git_tree_diff_auto_anchor*
+g:git_tree_diff_auto_anchor
+    Initial state of the automatic diff anchors of a new tab page, see
+    |:FGitTreeDiffAutoAnchorsToggle|: 1 on, 0 off.  Default: 1
 
                                                       *g:git_tree_diff_browser*
 g:git_tree_diff_browser

@@ -175,6 +175,8 @@ function! git_tree_diff#run(args) abort
         \ 'right_ref': l:spec.right,
         \ 'right_label': l:spec.right_label,
         \ 'log_win': 0, 'tree_win': 0, 'left_win': 0, 'right_win': 0,
+        \ 'auto_anchor': get(g:, 'git_tree_diff_auto_anchor', 1),
+        \ 'manual_anchors': [], 'anchor_pending': [], 'anchor_path': '',
         \ }
   call s:ShowTree(l:files, s:FileStatuses(l:root, a:args))
 endfunction
@@ -352,6 +354,7 @@ function! s:OpenDiff(path) abort
   endif
   let l:origin = win_getid()
   call s:EnsureWindows()
+  call s:ApplyDiffOpt()
 
   call win_gotoid(t:gtd.left_win)
   diffoff
@@ -362,6 +365,21 @@ function! s:OpenDiff(path) abort
   diffoff
   call s:LoadVersion(t:gtd.right_ref, t:gtd.right_label, a:path)
   diffthis
+  if t:gtd.right_ref ==# s:WORKTREE
+    " a working tree file changes on save; the anchor line numbers with it
+    augroup gtd_anchors
+      autocmd! * <buffer>
+      autocmd BufWritePost <buffer> call git_tree_diff#reapply_anchors()
+    augroup END
+  endif
+
+  " manual anchors belong to one file pair
+  if get(t:gtd, 'anchor_path', '') !=# a:path
+    let t:gtd.anchor_path = a:path
+    let t:gtd.manual_anchors = []
+    let t:gtd.anchor_pending = []
+  endif
+  call s:ApplyAnchors()
 
   call win_gotoid(l:origin)
 endfunction
@@ -400,6 +418,215 @@ function! s:LoadVersion(ref, label, path) abort
 endfunction
 
 " ---------------------------------------------------------------------------
+" diff alignment ('diffopt' defaults and diff anchors)
+" ---------------------------------------------------------------------------
+
+" Add the 'diffopt' items of g:git_tree_diff_diffopt to the global 'diffopt'.
+" An item is skipped if 'diffopt' already has an item of the same name (so an
+" explicit user choice like algorithm:patience wins) or if this Vim version
+" does not know it.
+function! s:ApplyDiffOpt() abort
+  let l:present = map(split(&diffopt, ','), 'matchstr(v:val, "^[^:]*")')
+  for l:item in split(get(g:, 'git_tree_diff_diffopt',
+        \ 'algorithm:histogram,indent-heuristic,linematch:60'), ',')
+    if index(l:present, matchstr(l:item, '^[^:]*')) < 0
+      silent! execute 'set diffopt+=' . l:item
+    endif
+  endfor
+endfunction
+
+" Anchor candidates for the two file versions: every non-blank line whose
+" text occurs exactly once in both versions.  Of those, the largest subset
+" appearing in the same order in both versions (the longest increasing
+" subsequence) is returned as a list of [left lnum, right lnum] pairs -
+" anchors must not cross, as Vim pairs them sorted by line number.
+function! s:ComputeAutoAnchors(left, right) abort
+  let l:lcount = {}
+  for l:t in a:left
+    if l:t =~# '\S'
+      let l:lcount[l:t] = get(l:lcount, l:t, 0) + 1
+    endif
+  endfor
+  let l:rcount = {}
+  let l:rline = {}
+  for l:i in range(len(a:right))
+    let l:t = a:right[l:i]
+    if l:t =~# '\S'
+      let l:rcount[l:t] = get(l:rcount, l:t, 0) + 1
+      let l:rline[l:t] = l:i + 1
+    endif
+  endfor
+  let l:pairs = []
+  for l:i in range(len(a:left))
+    let l:t = a:left[l:i]
+    if l:t =~# '\S' && get(l:lcount, l:t) == 1 && get(l:rcount, l:t) == 1
+      call add(l:pairs, [l:i + 1, l:rline[l:t]])
+    endif
+  endfor
+  return s:Lis(l:pairs)
+endfunction
+
+" Longest subsequence of a:pairs that is strictly increasing in the second
+" component (the first component is already ascending).
+function! s:Lis(pairs) abort
+  let l:tails = []
+  let l:prev = repeat([-1], len(a:pairs))
+  for l:i in range(len(a:pairs))
+    let l:lo = 0
+    let l:hi = len(l:tails)
+    while l:lo < l:hi
+      let l:mid = (l:lo + l:hi) / 2
+      if a:pairs[l:tails[l:mid]][1] < a:pairs[l:i][1]
+        let l:lo = l:mid + 1
+      else
+        let l:hi = l:mid
+      endif
+    endwhile
+    if l:lo > 0
+      let l:prev[l:i] = l:tails[l:lo - 1]
+    endif
+    if l:lo == len(l:tails)
+      call add(l:tails, l:i)
+    else
+      let l:tails[l:lo] = l:i
+    endif
+  endfor
+  let l:res = []
+  let l:i = empty(l:tails) ? -1 : l:tails[-1]
+  while l:i >= 0
+    call insert(l:res, a:pairs[l:i])
+    let l:i = l:prev[l:i]
+  endwhile
+  return l:res
+endfunction
+
+" Set 'diffanchors' in both diff buffers: the manual anchors added with
+" :FGitTreeDiffAnchorAdd plus - unless switched off with
+" :FGitTreeDiffAutoAnchorsToggle - the automatic ones.  Vim allows at most 20
+" anchors per buffer, so surplus automatic pairs are sampled evenly.
+function! s:ApplyAnchors() abort
+  if !exists('+diffanchors') || !exists('t:gtd')
+        \ || !win_id2win(t:gtd.left_win) || !win_id2win(t:gtd.right_win)
+    return
+  endif
+  let l:lbuf = winbufnr(win_id2win(t:gtd.left_win))
+  let l:rbuf = winbufnr(win_id2win(t:gtd.right_win))
+  let l:left = getbufline(l:lbuf, 1, '$')
+  let l:right = getbufline(l:rbuf, 1, '$')
+  " manual anchors first; stale line numbers (file shrunk on save) dropped
+  let l:manual = filter(copy(get(t:gtd, 'manual_anchors', [])),
+        \ 'v:val[0] <= len(l:left) && v:val[1] <= len(l:right)')[: 19]
+  let l:pairs = copy(l:manual)
+  if get(t:gtd, 'auto_anchor', 1)
+    let l:auto = s:ComputeAutoAnchors(l:left, l:right)
+    " a manual anchor overrides automatic ones that would cross it
+    for l:m in l:manual
+      call filter(l:auto, '(v:val[0] - l:m[0]) * (v:val[1] - l:m[1]) > 0')
+    endfor
+    let l:slots = 20 - len(l:manual)
+    if len(l:auto) > l:slots
+      let l:sampled = []
+      for l:i in range(max([l:slots, 0]))
+        call add(l:sampled, l:auto[l:slots == 1 ? len(l:auto) / 2
+              \ : (l:i * (len(l:auto) - 1)) / (l:slots - 1)])
+      endfor
+      let l:auto = l:sampled
+    endif
+    call extend(l:pairs, l:auto)
+  endif
+  call sort(l:pairs, {a, b -> a[0] - b[0]})
+  call setbufvar(l:lbuf, '&diffanchors',
+        \ join(map(copy(l:pairs), 'v:val[0]'), ','))
+  call setbufvar(l:rbuf, '&diffanchors',
+        \ join(map(copy(l:pairs), 'v:val[1]'), ','))
+  if !empty(l:pairs)
+    silent! set diffopt+=anchor
+  endif
+  silent! diffupdate
+endfunction
+
+function! s:AnchorWindows() abort
+  if !exists('+diffanchors')
+    echohl ErrorMsg
+    echomsg 'git-tree-diff: this Vim has no diff anchor support'
+          \ . ' (needs 9.1.1243 or later)'
+    echohl None
+    return 0
+  endif
+  if !exists('t:gtd')
+        \ || !win_id2win(t:gtd.left_win) || !win_id2win(t:gtd.right_win)
+    echohl ErrorMsg
+    echomsg 'git-tree-diff: no git-tree-diff diff windows in this tab page'
+    echohl None
+    return 0
+  endif
+  return 1
+endfunction
+
+function! git_tree_diff#auto_anchors_toggle() abort
+  if !s:AnchorWindows()
+    return
+  endif
+  let t:gtd.auto_anchor = !get(t:gtd, 'auto_anchor', 1)
+  call s:ApplyAnchors()
+  echo 'git-tree-diff: automatic diff anchors '
+        \ . (t:gtd.auto_anchor ? 'on' : 'off')
+endfunction
+
+" Manually anchor a line of one diff window to a line of the other, in two
+" steps (the cursors of the two windows are linked by 'cursorbind', so the
+" two lines cannot be picked with a single command): the first call marks
+" the cursor line, the second call - from the other diff window - completes
+" the pair.
+function! git_tree_diff#anchor_add() abort
+  if !s:AnchorWindows()
+    return
+  endif
+  let l:cur = win_getid()
+  if l:cur != t:gtd.left_win && l:cur != t:gtd.right_win
+    echohl ErrorMsg
+    echomsg 'git-tree-diff: run :FGitTreeDiffAnchorAdd in a diff window'
+    echohl None
+    return
+  endif
+  let l:pending = get(t:gtd, 'anchor_pending', [])
+  let l:other = l:cur == t:gtd.left_win ? t:gtd.right_win : t:gtd.left_win
+  if len(l:pending) != 2 || l:pending[0] != l:other
+    let t:gtd.anchor_pending = [l:cur, line('.')]
+    echo 'git-tree-diff: anchor start set at line ' . line('.') . '; run'
+          \ . ' :FGitTreeDiffAnchorAdd on the matching line in the other'
+          \ . ' diff window'
+    return
+  endif
+  let l:pair = l:cur == t:gtd.right_win
+        \ ? [l:pending[1], line('.')] : [line('.'), l:pending[1]]
+  let t:gtd.anchor_pending = []
+  " the newest manual anchor wins: drop manual anchors crossing it
+  call filter(t:gtd.manual_anchors,
+        \ '(v:val[0] - l:pair[0]) * (v:val[1] - l:pair[1]) > 0')
+  call add(t:gtd.manual_anchors, l:pair)
+  call s:ApplyAnchors()
+  echo 'git-tree-diff: anchored left line ' . l:pair[0]
+        \ . ' to right line ' . l:pair[1]
+endfunction
+
+function! git_tree_diff#anchors_clear() abort
+  if !s:AnchorWindows()
+    return
+  endif
+  let t:gtd.manual_anchors = []
+  let t:gtd.anchor_pending = []
+  call s:ApplyAnchors()
+  echo 'git-tree-diff: manual diff anchors cleared'
+endfunction
+
+function! git_tree_diff#reapply_anchors() abort
+  if exists('t:gtd')
+    call s:ApplyAnchors()
+  endif
+endfunction
+
+" ---------------------------------------------------------------------------
 " log browser (:FGitLog)
 " ---------------------------------------------------------------------------
 
@@ -432,6 +659,8 @@ function! git_tree_diff#log(arg) abort
         \ 'root': l:root,
         \ 'log_win': win_getid(),
         \ 'tree_win': 0, 'left_win': 0, 'right_win': 0,
+        \ 'auto_anchor': get(g:, 'git_tree_diff_auto_anchor', 1),
+        \ 'manual_anchors': [], 'anchor_pending': [], 'anchor_path': '',
         \ }
   call s:SetupLogBuffer(l:out)
 endfunction

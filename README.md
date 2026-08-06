@@ -35,6 +35,23 @@ commit reuses the same windows.
 :FGitLog all                     " git log --graph --decorate --all
 ```
 
+## Diff alignment
+
+For readable diffs the plugin adds `algorithm:histogram`, `indent-heuristic`
+and `linematch:60` to `'diffopt'` (configurable via
+`g:git_tree_diff_diffopt`). When the two versions of a file have diverged
+heavily, *diff anchors* (Vim ≥ 9.1.1243) additionally keep matching parts
+aligned: every line whose text is unique in both versions and appears in
+the same order is anchored to its counterpart, so e.g. a function that was
+moved and edited is compared against its counterpart instead of showing up
+as deleted plus added.
+
+| Command                      | Action                                        |
+|------------------------------|-----------------------------------------------|
+| `:FGitTreeDiffAutoAnchorsToggle` | Toggle the automatic anchors (per tab page)   |
+| `:FGitTreeDiffAnchorAdd`     | Manually anchor a line pair: run it once on a line in each diff window |
+| `:FGitTreeDiffAnchorsClear`  | Remove the manual anchors                     |
+
 ## Pull requests
 
 Requires the [gh](https://cli.github.com/) command line tool (installed and
@@ -154,6 +171,8 @@ to a temporary directory — the repository stays clean.
 | `g:git_tree_diff_log_width`          | `50`    | Width of the log window (`:FGitLog`)   |
 | `g:git_tree_diff_pr_comment_width`   | `50`    | Width of the PR comment window         |
 | `g:git_tree_diff_pr_comments_height` | `12`    | Height of the PR comment list window   |
+| `g:git_tree_diff_diffopt`            | see `:h` | `'diffopt'` items added when a diff opens |
+| `g:git_tree_diff_auto_anchor`        | `1`     | Automatic diff anchors initially on    |
 | `g:git_tree_diff_gh_cmd`             | `"gh"`  | The `gh` executable for GitHub access  |
 | `g:git_tree_diff_browser`            | `""`    | Browser command (`""` = OS default)    |
 | `g:git_tree_diff_pr_highlight_style` | `"underline"` | Commented-line highlight: `underline`, `italic`, `background` |

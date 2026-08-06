@@ -57,6 +57,11 @@ command! -nargs=* FGitTreeDiff call git_tree_diff#run(<q-args>)
 command! -nargs=? -complete=customlist,git_tree_diff#log_complete
       \ FGitLog call git_tree_diff#log(<q-args>)
 
+" Diff anchor control for the :FGitTreeDiff / :FGitLog diff windows.
+command! FGitTreeDiffAutoAnchorsToggle call git_tree_diff#auto_anchors_toggle()
+command! FGitTreeDiffAnchorAdd call git_tree_diff#anchor_add()
+command! FGitTreeDiffAnchorsClear call git_tree_diff#anchors_clear()
+
 " GitHub pull requests (require the 'gh' command line tool).
 command! FGitPrList call git_tree_diff#pr#list()
 command! FGitPrOfCurrentBranch call git_tree_diff#pr#of_current_branch()

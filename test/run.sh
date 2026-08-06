@@ -36,11 +36,15 @@ git init -q .
 printf 'one\ntwo\n' > a.txt
 printf 'bee\n' > b.txt
 printf 'cee cee cee\n' > sub/c.txt
+# f.c: bar() is moved above foo() and foo() is edited between the commits,
+# exercising the automatic diff anchors
+printf 'int foo() {\n    int n = 1;\n    return n;\n}\n\nint g = 1;\n\nint bar(int a) {\n    return a * 2;\n}\n' > f.c
 git add -A && git commit -qm c1
 printf 'one\nTWO\n' > a.txt
 git rm -q b.txt
 printf 'dee\n' > d.txt
 git mv sub/c.txt sub/e.txt
+printf 'int bar(int a) {\n    return a * 2;\n}\n\nint foo() {\n    int n = 999;\n    return n;\n}\n\nint g = 1;\n' > f.c
 git add -A && git commit -qm c2
 
 cd "$W/repo" && timeout 60 vim -N -u NONE -i NONE -n -es -S "$S/prtest.vim" </dev/null >/dev/null 2>&1
